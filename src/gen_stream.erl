@@ -30,6 +30,7 @@
 
 -module(gen_stream).
 -author("epappas").
+-vsn("0.0.1").
 
 -behaviour(gen_fsm).
 
