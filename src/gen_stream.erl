@@ -36,6 +36,7 @@
 
 %% API
 -export([
+  start/1,
   start_link/0,
   start_link/4,
   pipe/1,
@@ -69,8 +70,11 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+-spec(start(any()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
+start(Name) ->
+  gen_fsm:start(?MODULE, [Name], []).
 
--spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
+-spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
 start_link(Name, Mod, Args, Options) ->
   gen_fsm:start_link(Name, Mod, Args, Options).
 
@@ -78,11 +82,11 @@ start_link(Name, Mod, Args, Options) ->
 start_link() ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
--spec(pipe(any(), any()) -> {ok, pid()}).
+-spec(pipe(any()) -> {ok, pid()}).
 pipe(Mod) -> pipe(Mod, []).
 
 -spec(pipe(any(), any()) -> {ok, pid()}).
-pipe(Mod, Args) -> {ok, ?MODULE}.
+pipe(Mod, Args) -> {ok, {?MODULE, {Mod, Args}}}.
 
 %%%===================================================================
 %%% gen_fsm callbacks
