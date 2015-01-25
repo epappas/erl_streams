@@ -38,7 +38,10 @@
 
 %% gen_stream callbacks
 -export([
-  
+  init/1,
+  handle/3,
+  close/3,
+  code_change/4
 ]).
 
 -define(SERVER, ?MODULE).
@@ -57,7 +60,17 @@ start_link() ->
 %%% gen_stream callbacks
 %%%===================================================================
 
+init(_Args) ->
+  erlang:error(not_implemented).
 
+handle(_Event, _StateName, _StateData) ->
+  erlang:error(not_implemented).
+
+close(_Reason, _StateName, _StateData) ->
+  erlang:error(not_implemented).
+
+code_change(_OldVsn, _StateName, _StateData, _Extra) ->
+  erlang:error(not_implemented).
 
 %%%===================================================================
 %%% Internal functions

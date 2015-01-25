@@ -34,16 +34,45 @@
 -behaviour(gen_stream).
 
 %% API
--export([start_link/0]).
+-export([
+  start_link/0,
+  pause/0,
+  pause/1,
+  resume/0,
+  drain/0
+]).
 
 %% gen_stream callbacks
 -export([
-
+  init/1,
+  handle/3,
+  close/3,
+  code_change/4
 ]).
 
 -define(SERVER, ?MODULE).
 
 -record(state, {}).
+
+%%%===================================================================
+%%% Interface functions.
+%%%===================================================================
+
+-callback init(Args :: term()) ->
+  {ok, StateData :: term()} |
+  {stop, Reason :: term()} | ignore.
+-callback data(
+    DataChunk :: any(),
+    StateData :: term()
+) -> any().
+-callback close(Reason :: normal | shutdown | {shutdown, term()} | term(),
+    StateData :: term()
+) -> any().
+-callback code_change(
+    OldVsn :: term() |
+    {down, term()},
+    StateData :: term()
+) -> any().
 
 %%%===================================================================
 %%% API
@@ -53,11 +82,29 @@
 start_link() ->
   gen_stream:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+pause() -> ok.
+
+pause(_Timeout) -> ok.
+
+resume() -> ok.
+
+drain() -> ok.
+
 %%%===================================================================
 %%% gen_stream callbacks
 %%%===================================================================
 
+init(_Args) ->
+  erlang:error(not_implemented).
 
+handle(_Event, _StateName, _StateData) ->
+  erlang:error(not_implemented).
+
+close(_Reason, _StateName, _StateData) ->
+  erlang:error(not_implemented).
+
+code_change(_OldVsn, _StateName, _StateData, _Extra) ->
+  erlang:error(not_implemented).
 
 %%%===================================================================
 %%% Internal functions
