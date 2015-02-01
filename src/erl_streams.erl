@@ -33,6 +33,8 @@
 
 -behaviour(application).
 
+-include("erl_streams_commons.hrl").
+
 %% Application callbacks
 -export([
   start/2,
@@ -59,6 +61,62 @@ start(_StartType, _StartArgs) ->
 -spec(stop(State :: term()) -> term()).
 stop(_State) ->
   ok.
+
+-spec(new(Name :: term(), Fn :: fun()) -> #stream{}).
+new(Name, Fn) -> #stream{}.
+
+-spec(new(Fn :: fun()) -> #stream{}).
+new(Fn) -> #stream{}.
+
+-spec(from_list(List :: iolist()) -> #stream{}).
+from_list(List) -> #stream{}.
+
+-spec(pause(Stream :: #stream{}) -> #stream{}).
+pause(Stream) -> Stream#stream{is_paused = true}.
+
+-spec(drain(Stream :: #stream{}) -> #stream{}).
+drain(Stream) -> #stream{}.
+
+-spec(take(Stream :: #stream{}) -> binary()).
+take(Stream) -> <<"">>.
+
+-spec(take_until(Stream :: #stream{}, Fn :: fun()) -> binary()).
+take_until(Stream, Fn) -> <<"">>.
+
+-spec(take_while(Stream :: #stream{}, Fn :: fun()) -> binary()).
+take_while(Stream, Fn) -> <<"">>.
+
+-spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+filter(Stream, Fn) -> #stream{}.
+
+-spec(drop(Stream :: #stream{}) -> #stream{}).
+drop(Stream) -> #stream{}.
+
+-spec(drop_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+drop_while(Stream, Fn) -> #stream{}.
+
+-spec(drop_until(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+drop_until(Stream, Fn) -> #stream{}.
+
+-spec(delay(Stream :: #stream{}) -> #stream{}).
+delay(Stream) -> #stream{}.
+
+-spec(delay_until(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+delay_until(Stream, Fn) -> ok.
+
+-spec(delay_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+delay_while(Stream, Fn) -> #stream{}.
+
+-spec(map(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+map(Stream, Fn) -> #stream{}.
+
+-spec(zip(Left, Right) -> #stream{}).
+zip(Left, Right) -> #stream{}.
+
+-spec(is_empty(Stream :: #stream{}) -> boolean()).
+is_empty(#stream{buffer = []} = Stream) -> true;
+
+is_empty(#stream{} = Stream) -> false.
 
 %%%===================================================================
 %%% Internal functions
