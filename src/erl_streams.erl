@@ -63,7 +63,8 @@ stop(_State) ->
   ok.
 
 -spec(new(Name :: term(), Fn :: fun()) -> #stream{}).
-new(Name, Fn) -> #stream{}.
+new(Name, Fn) ->
+  #stream{}.
 
 -spec(new(Fn :: fun()) -> #stream{}).
 new(Fn) -> #stream{}.
@@ -85,6 +86,9 @@ take_until(Stream, Fn) -> <<"">>.
 
 -spec(take_while(Stream :: #stream{}, Fn :: fun()) -> binary()).
 take_while(Stream, Fn) -> <<"">>.
+
+-spec(take_and_pause(Stream :: #stream{}) -> {Stream, binary()}).
+take_and_pause(Stream) -> {Stream, <<"">>}.
 
 -spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 filter(Stream, Fn) -> #stream{}.
@@ -109,6 +113,12 @@ delay_while(Stream, Fn) -> #stream{}.
 
 -spec(map(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 map(Stream, Fn) -> #stream{}.
+
+-spec(reduce(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+reduce(Stream, Fn) -> reduce(Stream, Fn, undefined).
+
+-spec(reduce(Stream :: #stream{}, Fn :: fun(), Acc :: any()) -> #stream{}).
+reduce(Stream, Fn, Acc) -> #stream{}.
 
 -spec(zip(Left, Right) -> #stream{}).
 zip(Left, Right) -> #stream{}.
