@@ -78,6 +78,16 @@ pause(Stream) -> Stream#stream{is_paused = true}.
 -spec(drain(Stream :: #stream{}) -> #stream{}).
 drain(Stream) -> #stream{}.
 
+-spec(put(Stream :: #stream{}, Resource :: any()) ->
+  {ok, #stream{}} | {paused, #stream{} | {closed, #stream{}}}).
+put(Stream, Resource) -> {ok, #stream{}}.
+
+-spec(put(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+put_while(Stream, Fn) -> #stream{}.
+
+-spec(take(Stream :: #stream{}, Number :: number()) -> list()).
+take(Stream, Number) -> [<<"">>].
+
 -spec(take(Stream :: #stream{}) -> binary()).
 take(Stream) -> <<"">>.
 
