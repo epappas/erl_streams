@@ -136,6 +136,11 @@ take(#stream{buffer = Buffer} = Stream) ->
   [H | T] = Buffer,
   {Stream#stream{buffer = T}, H}.
 
+-spec(take_and_pause(Stream :: #stream{}) -> {Stream, iolist()}).
+take_and_pause(#stream{} = Stream) ->
+  {NewStream, Resource} = take(Stream),
+  {NewStream#stream{is_paused = true}, Resource}.
+
 -spec(take_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 take_while(Stream, Fn) ->
   {NewStream, Resource} = take(Stream),
@@ -143,9 +148,6 @@ take_while(Stream, Fn) ->
     true -> take_while(NewStream, Fn);
     false -> NewStream
   end.
-
--spec(take_and_pause(Stream :: #stream{}) -> {Stream, iolist()}).
-take_and_pause(Stream) -> {Stream, <<"">>}.
 
 -spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 filter(Stream, Fn) -> #stream{}.
@@ -156,14 +158,8 @@ drop(Stream) -> #stream{}.
 -spec(drop_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 drop_while(Stream, Fn) -> #stream{}.
 
--spec(drop_until(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-drop_until(Stream, Fn) -> #stream{}.
-
 -spec(delay(Stream :: #stream{}) -> #stream{}).
 delay(Stream) -> #stream{}.
-
--spec(delay_until(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-delay_until(Stream, Fn) -> ok.
 
 -spec(delay_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 delay_while(Stream, Fn) -> #stream{}.
@@ -181,9 +177,8 @@ reduce(Stream, Fn, Acc) -> #stream{}.
 zip(Left, Right) -> #stream{}.
 
 -spec(is_empty(Stream :: #stream{}) -> boolean()).
-is_empty(#stream{buffer = []} = Stream) -> true;
-
-is_empty(#stream{} = Stream) -> false.
+is_empty(#stream{buffer = []} = _Stream) -> true;
+is_empty(#stream{} = _Stream) -> false.
 
 %%%===================================================================
 %%% Internal functions
