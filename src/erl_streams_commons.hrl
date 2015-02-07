@@ -32,12 +32,12 @@
 
 -record(stream, {
   pid,
+  name,
+  producer,
   buffer = [],
   pipes = [],
+  is_closed = false,
   is_paused = false,
-  is_stoped = false,
-  is_reading = false,
-  is_writing = false,
-  has_started = false
+  is_stoped = false
 }).
 

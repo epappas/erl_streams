@@ -64,10 +64,10 @@ stop(_State) ->
 
 -spec(new(Name :: term(), Fn :: fun()) -> #stream{}).
 new(Name, Fn) ->
-  #stream{}.
+  #stream{name = Name, producer = Fn}.
 
 -spec(new(Fn :: fun()) -> #stream{}).
-new(Fn) -> #stream{}.
+new(Fn) -> new(0, Fn).
 
 -spec(from_list(List :: iolist()) -> #stream{}).
 from_list(List) -> #stream{}.
@@ -76,28 +76,75 @@ from_list(List) -> #stream{}.
 pause(Stream) -> Stream#stream{is_paused = true}.
 
 -spec(drain(Stream :: #stream{}) -> #stream{}).
-drain(Stream) -> #stream{}.
+drain(Stream) ->
+  #stream{is_paused = false}.
 
 -spec(put(Stream :: #stream{}, Resource :: any()) ->
-  {ok, #stream{}} | {paused, #stream{} | {closed, #stream{}}}).
-put(Stream, Resource) -> {ok, #stream{}}.
+  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
+put(#stream{is_paused = false} = Stream, _Resource) ->
+  {pause, Stream};
+put(#stream{is_stoped = false} = Stream, _Resource) ->
+  {stopped, Stream};
+put(#stream{is_closed = true} = Stream, _Resource) ->
+  {closed, Stream};
 
--spec(put(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-put_while(Stream, Fn) -> #stream{}.
+put(#stream{
+  is_paused = false,
+  is_stoped = false,
+  is_closed = false,
+  buffer = Buffer
+} = Stream, Resource) ->
+  {ok, Stream#stream{
+    buffer = lists:append(Buffer,[Resource])
+  }}.
 
--spec(take(Stream :: #stream{}, Number :: number()) -> list()).
-take(Stream, Number) -> [<<"">>].
+-spec(put_while(Stream :: #stream{}, Fn :: fun()) ->
+  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
 
--spec(take(Stream :: #stream{}) -> binary()).
-take(Stream) -> <<"">>.
+put_while(#stream{is_paused = false} = Stream, _Fn) ->
+  {pause, Stream};
+put_while(#stream{is_stoped = false} = Stream, _Fn) ->
+  {stopped, Stream};
+put_while(#stream{is_closed = true} = Stream, _Fn) ->
+  {closed, Stream};
 
--spec(take_until(Stream :: #stream{}, Fn :: fun()) -> binary()).
-take_until(Stream, Fn) -> <<"">>.
+put_while(#stream{
+  is_paused = false,
+  is_stoped = false,
+  is_closed = false
+} = Stream, Fn) when is_function(Fn) ->
+  case Fn(Stream) of
+    undefined -> {ok, Stream};
+    Resource -> put(Stream, Resource)
+  end.
 
--spec(take_while(Stream :: #stream{}, Fn :: fun()) -> binary()).
-take_while(Stream, Fn) -> <<"">>.
+-spec(take(Stream :: #stream{}, Number :: number()) -> {#stream{}, list()}).
+take(#stream{is_closed = true} = Stream, _Number)-> {Stream, []};
+take(#stream{is_closed = true} = Stream, _Number)-> {Stream, []};
+take(#stream{} = Stream, Number) when Number =< 0 -> {Stream, []};
+take(#stream{} = Stream, Number) -> take_loop(Stream, Number, []).
 
--spec(take_and_pause(Stream :: #stream{}) -> {Stream, binary()}).
+take_loop(#stream{} = Stream, 0, SoFar) -> {Stream, SoFar};
+take_loop(#stream{buffer = Buffer} = Stream, _Number, SoFar) when Buffer =:= [] -> {Stream, SoFar};
+take_loop(#stream{buffer = Buffer} = Stream, Number, SoFar) ->
+  [H | T] = Buffer,
+  take_loop(Stream#stream{buffer = T}, Number - 1, lists:append(SoFar, H)).
+
+-spec(take(Stream :: #stream{}) -> {#stream{}, iolist()}).
+take(#stream{buffer = Buffer} = _Stream) when Buffer =:= [] -> {#stream, undefined};
+take(#stream{buffer = Buffer} = Stream) ->
+  [H | T] = Buffer,
+  {Stream#stream{buffer = T}, H}.
+
+-spec(take_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+take_while(Stream, Fn) ->
+  {NewStream, Resource} = take(Stream),
+  case Fn(Resource) of
+    true -> take_while(NewStream, Fn);
+    false -> NewStream
+  end.
+
+-spec(take_and_pause(Stream :: #stream{}) -> {Stream, iolist()}).
 take_and_pause(Stream) -> {Stream, <<"">>}.
 
 -spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
