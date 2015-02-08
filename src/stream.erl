@@ -35,8 +35,8 @@
 
 %% API
 -export([
+  new/0,
   new/1,
-  new/2,
   from_list/1,
   pause/1,
   drain/1,
@@ -59,18 +59,18 @@
   is_empty/1
 ]).
 
--spec(new(Name :: term(), Fn :: fun()) -> #stream{}).
-new(Name, Fn) ->
-  #stream{name = Name, producer = Fn}.
+-spec(new() -> #stream{}).
+new() -> new(new_stream).
 
--spec(new(Fn :: fun()) -> #stream{}).
-new(Fn) -> new(new_stream, Fn).
+-spec(new(Name :: term()) -> #stream{}).
+new(Name) ->
+  #stream{name = Name}.
 
 -spec(from_list(List :: iolist()) -> #stream{}).
 from_list(List) ->
-  new(from_list, fun(#stream{} = Stream) ->
-      stream:put_from_list(Stream, List)
-    end).
+  Stream = new(from_list),
+  {ok, NewStream} = stream:put_from_list(Stream, List),
+  NewStream.
 
 -spec(pause(Stream :: #stream{}) -> #stream{}).
 pause(Stream) -> Stream#stream{is_paused = true}.
