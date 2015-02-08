@@ -65,6 +65,12 @@
     DataChunk :: any(),
     StateData :: term()
 ) -> any().
+-callback on_pause(
+    StateData :: term()
+) -> any().
+-callback on_resume(
+    StateData :: term()
+) -> any().
 -callback close(Reason :: normal | shutdown | {shutdown, term()} | term(),
     StateData :: term()
 ) -> any().

@@ -41,6 +41,7 @@
   pause/1,
   drain/1,
   put/2,
+  put_from_list/2,
   put_while/2,
   take/1,
   take/2,
@@ -68,7 +69,7 @@ new(Fn) -> new(new_stream, Fn).
 -spec(from_list(List :: iolist()) -> #stream{}).
 from_list(List) ->
   new(from_list, fun(#stream{} = Stream) ->
-      stream:put(Stream, List) %% TODO implement put_list()
+      stream:put_from_list(Stream, List)
     end).
 
 -spec(pause(Stream :: #stream{}) -> #stream{}).
@@ -97,6 +98,16 @@ put(#stream{
   {ok, Stream#stream{
     buffer = lists:append(Buffer, [Resource])
   }}.
+
+-spec(put_from_list(Stream :: #stream{}, ResourceList :: list()) ->
+  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
+put_from_list(#stream{} = Stream, ResourceList) when ResourceList =:= [] -> {ok, Stream#stream{}};
+put_from_list(#stream{} = Stream, ResourceList) ->
+  [H | T] = ResourceList,
+  case stream:put(Stream, H) of
+    {ok, NewStream} -> stream:put_from_list(NewStream, T);
+    OtherState -> OtherState %% closed, isPaused, or anything else
+  end.
 
 -spec(put_while(Stream :: #stream{}, Fn :: fun()) ->
   {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
