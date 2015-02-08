@@ -36,6 +36,8 @@
   producer,
   buffer = [],
   pipes = [],
+  pre_waterfall = [],
+  post_waterfall = [],
   is_closed = false,
   is_paused = false,
   is_stoped = false
