@@ -40,6 +40,7 @@
   post_waterfall = [],
   is_closed = false,
   is_paused = false,
-  is_stoped = false
+  is_stoped = false,
+  max_buffer = 134217728
 }).
 

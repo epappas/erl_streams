@@ -88,6 +88,9 @@ put(#stream{is_stoped = false} = Stream, _Resource) ->
   {stopped, Stream};
 put(#stream{is_closed = true} = Stream, _Resource) ->
   {closed, Stream};
+put(#stream{buffer = Buffer, max_buffer = MAX} = Stream, _Resource) when length(Buffer) >= MAX ->
+  %% a Guard to avoid back pressure
+  {pause, Stream#stream{is_paused = true}};
 
 put(#stream{
   is_paused = false,
@@ -111,7 +114,6 @@ put_from_list(#stream{} = Stream, ResourceList) ->
 
 -spec(put_while(Stream :: #stream{}, Fn :: fun()) ->
   {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
-
 put_while(#stream{is_paused = false} = Stream, _Fn) ->
   {pause, Stream};
 put_while(#stream{is_stoped = false} = Stream, _Fn) ->
