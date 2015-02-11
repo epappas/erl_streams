@@ -30,10 +30,25 @@
 %%% @end
 %%%-------------------------------------------------------------------
 
+-include("../src/erl_streams_commons.hrl").
+
 main(_) ->
   etap:plan(3),
-  etap:ok(true, "the 'true' atom is recognized"),
-  etap:is(1 + 1, 2, "simple math"),
-  etap:isnt(2 + 2, 5, "some would argue"),
+  Stream = stream:new(),
+  #stream{name = Name} = Stream,
+
+  %% Basic dummy tests
+  etap:is(Name =:= new_stream, true, "Anonymous Stream is named correctly"),
+  etap:is(stream:is_empty(Stream), true, "New Streams should be empty"),
+
+  %% TEST list insertion
+  {ok, Stream0} = stream:put_from_list(Stream, [1, 2, 3]),
+
+  {Stream1, A} = stream:take(Stream0),
+  {Stream2, B} = stream:take(Stream1),
+  {_Stream3, C} = stream:take(Stream2),
+
+  etap:is([A, B, C], [1,2,3], "Take should get the elements from the inserted list"),
+
   etap:end_tests(),
   ok.
