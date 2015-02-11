@@ -82,9 +82,9 @@ drain(_Stream) ->
 
 -spec(put(Stream :: #stream{}, Resource :: any()) ->
   {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
-put(#stream{is_paused = false} = Stream, _Resource) ->
+put(#stream{is_paused = true} = Stream, _Resource) ->
   {pause, Stream};
-put(#stream{is_stoped = false} = Stream, _Resource) ->
+put(#stream{is_stoped = true} = Stream, _Resource) ->
   {stopped, Stream};
 put(#stream{is_closed = true} = Stream, _Resource) ->
   {closed, Stream};
