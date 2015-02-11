@@ -208,12 +208,16 @@ reduce(#stream{post_waterfall = PostWaterfall} = Stream, Fn, Acc) when is_functi
     )
   }.
 
-%% TODO
 -spec(zip(Left :: #stream{}, Right :: #stream{}) -> #stream{}).
-zip(#stream{} = _Left, #stream{} = _Right) ->
-  new(fun(#stream{} = Stream) ->
-    Stream
-  end).
+zip(#stream{buffer = LBuffer, pre_waterfall = LPRW, post_waterfall = LPOW} = _Left,
+    #stream{buffer = RBuffer, pre_waterfall = RPRW, post_waterfall = RPOW} = _Right) ->
+  Stream = new(),
+  Stream#stream{
+    buffer = lists:append(LBuffer, RBuffer),
+    pre_waterfall = lists:append(LPRW, RPRW),
+    post_waterfall = lists:append(LPOW, RPOW)
+  }
+.
 
 -spec(is_empty(Stream :: #stream{}) -> boolean()).
 is_empty(#stream{buffer = []} = _Stream) -> true;
