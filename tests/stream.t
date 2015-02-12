@@ -33,7 +33,7 @@
 -include("../src/erl_streams_commons.hrl").
 
 main(_) ->
-  etap:plan(3),
+  etap:plan(4),
   Stream = stream:new(),
   #stream{name = Name} = Stream,
 
@@ -41,14 +41,20 @@ main(_) ->
   etap:is(Name =:= new_stream, true, "Anonymous Stream is named correctly"),
   etap:is(stream:is_empty(Stream), true, "New Streams should be empty"),
 
+  %% TEST simple put
+  {ok, StreamA0} = stream:put(Stream, 0),
+  {_StreamA1, AA} = stream:take(StreamA0),
+
+  etap:is(AA, AA, "Simple take and put case"),
+
   %% TEST list insertion
-  {ok, Stream0} = stream:put_from_list(Stream, [1, 2, 3]),
+  {ok, StreamB0} = stream:put_from_list(Stream, [1, 2, 3]),
 
-  {Stream1, A} = stream:take(Stream0),
-  {Stream2, B} = stream:take(Stream1),
-  {_Stream3, C} = stream:take(Stream2),
+  {StreamB1, BA} = stream:take(StreamB0),
+  {StreamB2, BB} = stream:take(StreamB1),
+  {_StreamB3, BC} = stream:take(StreamB2),
 
-  etap:is([A, B, C], [1,2,3], "Take should get the elements from the inserted list"),
+  etap:is([BA, BB, BC], [1,2,3], "Take should get the elements from the inserted list"),
 
   etap:end_tests(),
   ok.
