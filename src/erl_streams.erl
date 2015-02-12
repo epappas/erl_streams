@@ -39,8 +39,7 @@
 -export([
   start/2,
   stop/1,
-  new/1,
-  new/2
+  new/1
 ]).
 
 %%%===================================================================
@@ -64,11 +63,8 @@ start(_StartType, _StartArgs) ->
 stop(_State) ->
   ok.
 
--spec(new(Fn :: fun()) -> #stream{}).
-new(Fn) -> stream:new(Fn).
-
--spec(new(Name :: term(), Fn :: fun()) -> #stream{}).
-new(Name, Fn) -> stream:new(Name, Fn).
+-spec(new(Name :: term()) -> #stream{}).
+new(Name) -> stream:new(Name).
 
 %%%===================================================================
 %%% Internal functions
