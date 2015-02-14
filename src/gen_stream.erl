@@ -34,6 +34,8 @@
 
 -behaviour(gen_fsm).
 
+-include("./erl_streams_commons.hrl").
+
 %% API
 -export([
   start/1,
@@ -46,8 +48,8 @@
 %% gen_fsm callbacks
 -export([
   init/1,
-  state_name/2,
-  state_name/3,
+  open/2,
+  open/3,
   handle_event/3,
   handle_sync_event/4,
   handle_info/3,
@@ -57,44 +59,15 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {
-  is_paused = false,
-  is_stoped = false,
-  is_reading = false,
-  is_writing = false,
-  has_started = false,
-  pipes = [],
-  buffer = []
-}).
+%% States
+-define(OPEN, open).
+-define(PAUSED, paused).
+-define(STOPPED, stopped).
+-define(CLOSED, closed).
 
 %%%===================================================================
 %%% Interface functions.
 %%%===================================================================
-
--callback init(Args :: term()) ->
-  {ok, StateName :: atom(), StateData :: term()} |
-  {ok, StateName :: atom(), StateData :: term(), timeout() | hibernate} |
-  {stop, Reason :: term()} | ignore.
--callback handle(
-    Event :: term(),
-    StateName :: atom(),
-    StateData :: term()
-) ->
-  {next, NextStateName :: atom(), NewStateData :: term()} |
-  {next, NextStateName :: atom(), NewStateData :: term(), timeout()} |
-  {stop, NewStateData :: term()} |
-  {stop, Reason :: term(), NewStateData :: term()} |
-  {error, Reason :: term(), NewStateData :: term()}.
--callback close(Reason :: normal | shutdown | {shutdown, term()} | term(),
-    StateName :: atom(),
-    StateData :: term()
-) -> term().
--callback code_change(
-    OldVsn :: term() |
-    {down, term()}, StateName :: atom(),
-    StateData :: term(), Extra :: term()
-) ->
-  {ok, NextStateName :: atom(), NewStateData :: term()}.
 
 %%%===================================================================
 %%% API
@@ -122,77 +95,135 @@ pipe(Mod, Args) -> {ok, {?MODULE, {Mod, Args}}}.
 %%%===================================================================
 
 -spec(init(Args :: term()) ->
-  {ok, StateName :: atom(), StateData :: #state{}} |
-  {ok, StateName :: atom(), StateData :: #state{}, timeout() | hibernate} |
+  {ok, StateName :: atom(), StateData :: #stream{}} |
+  {ok, StateName :: atom(), StateData :: #stream{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([]) ->
-  {ok, state_name, #state{}}.
+init(_Args) -> {ok, ?OPEN, stream:new()}.
 
--spec(state_name(Event :: term(), State :: #state{}) ->
-  {next_state, NextStateName :: atom(), NextState :: #state{}} |
-  {next_state, NextStateName :: atom(), NextState :: #state{},
-    timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-state_name(_Event, State) ->
-  {next_state, state_name, State}.
+%% ==========================================
+%% OPEN STATE
+%% ==========================================
 
--spec(state_name(Event :: term(), From :: {pid(), term()},
-    State :: #state{}) ->
-  {next_state, NextStateName :: atom(), NextState :: #state{}} |
-  {next_state, NextStateName :: atom(), NextState :: #state{},
-    timeout() | hibernate} |
-  {reply, Reply, NextStateName :: atom(), NextState :: #state{}} |
-  {reply, Reply, NextStateName :: atom(), NextState :: #state{},
-    timeout() | hibernate} |
-  {stop, Reason :: normal | term(), NewState :: #state{}} |
-  {stop, Reason :: normal | term(), Reply :: term(),
-    NewState :: #state{}}).
-state_name(_Event, _From, State) ->
-  Reply = ok,
-  {reply, Reply, state_name, State}.
+open({put, _Resource}, #stream{is_paused = true} = Stream) -> {next_state, ?PAUSED, Stream};
+open({put, _Resource}, #stream{is_stoped = true} = Stream) -> {next_state, ?STOPPED, Stream};
+open({put, _Resource}, #stream{is_closed = true} = Stream) -> {next_state, ?CLOSED, Stream};
 
--spec(handle_event(Event :: term(), StateName :: atom(),
-    StateData :: #state{}) ->
-  {next_state, NextStateName :: atom(), NewStateData :: #state{}} |
-  {next_state, NextStateName :: atom(), NewStateData :: #state{},
-    timeout() | hibernate} |
-  {stop, Reason :: term(), NewStateData :: #state{}}).
-handle_event(_Event, StateName, State) ->
-  {next_state, StateName, State}.
+open({put, Resource}, #stream{} = Stream) when is_list(Resource) ->
+  {ok, NewStream} = stream:put_from_list(Stream, Resource),
+  {next_state, ?OPEN, NewStream};
 
--spec(handle_sync_event(Event :: term(), From :: {pid(), Tag :: term()},
-    StateName :: atom(), StateData :: term()) ->
-  {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term()} |
-  {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term(),
-    timeout() | hibernate} |
-  {next_state, NextStateName :: atom(), NewStateData :: term()} |
-  {next_state, NextStateName :: atom(), NewStateData :: term(),
-    timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewStateData :: term()} |
-  {stop, Reason :: term(), NewStateData :: term()}).
-handle_sync_event(_Event, _From, StateName, State) ->
-  Reply = ok,
-  {reply, Reply, StateName, State}.
+open({put, Fn}, #stream{} = Stream) when is_function(Fn) ->
+  {ok, NewStream} = stream:put_while(Stream, Fn),
+  {next_state, ?OPEN, NewStream};
 
--spec(handle_info(Info :: term(), StateName :: atom(),
-    StateData :: term()) ->
-  {next_state, NextStateName :: atom(), NewStateData :: term()} |
-  {next_state, NextStateName :: atom(), NewStateData :: term(),
-    timeout() | hibernate} |
-  {stop, Reason :: normal | term(), NewStateData :: term()}).
-handle_info(_Info, StateName, State) ->
-  {next_state, StateName, State}.
+open({put, Resource}, #stream{} = Stream) ->
+  {ok, NewStream} = stream:put(Stream, Resource),
+  {next_state, ?OPEN, NewStream};
 
--spec(terminate(Reason :: normal | shutdown | {shutdown, term()}
-| term(), StateName :: atom(), StateData :: term()) -> term()).
-terminate(_Reason, _StateName, _State) ->
-  ok.
+open(_Event, #stream{} = State) -> {next_state, state_name, State}.
 
--spec(code_change(OldVsn :: term() | {down, term()}, StateName :: atom(),
-    StateData :: #state{}, Extra :: term()) ->
-  {ok, NextStateName :: atom(), NewStateData :: #state{}}).
-code_change(_OldVsn, StateName, State, _Extra) ->
-  {ok, StateName, State}.
+open(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, closed}, ?CLOSED, Stream};
+
+open(take, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {reply, {ok, Resource}, ?OPEN, NewStream};
+
+open({take, Number}, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {reply, {ok, ResourceList}, ?OPEN, NewStream};
+
+open(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
+
+%% ==========================================
+%% PAUSED STATE
+%% ==========================================
+
+%% ==========================================
+%% STOPPED STATE
+%% ==========================================
+
+%% ==========================================
+%% CLOSED STATE
+%% ==========================================
+
+%% -spec(handle_event(Event :: term(), StateName :: atom(),
+%%     StateData :: #stream{}) ->
+%%   {next_state, NextStateName :: atom(), NewStateData :: #stream{}} |
+%%   {next_state, NextStateName :: atom(), NewStateData :: #stream{},
+%%     timeout() | hibernate} |
+%%   {stop, Reason :: term(), NewStateData :: #stream{}}).
+
+%% ==========================================
+%% PIPE CALL
+%% ==========================================
+
+%% TODO
+handle_event({pipe, _Stream_FSM}, StateName, #stream{} = Stream) ->
+  {next_state, StateName, Stream};
+
+%% ==========================================
+%% DRAIN CALL
+%% ==========================================
+
+%% TODO
+
+%% ==========================================
+%% PAUSE CALL
+%% ==========================================
+
+%% TODO
+
+%% ==========================================
+%% FILTER CALL
+%% ==========================================
+
+%% TODO
+
+%% ==========================================
+%% MAP CALL
+%% ==========================================
+
+%% TODO
+
+%% ==========================================
+%% REDUCE CALL
+%% ==========================================
+
+%% TODO
+
+handle_event(_Event, StateName, State) -> {next_state, StateName, State}.
+
+%% -spec(handle_sync_event(Event :: term(), From :: {pid(), Tag :: term()},
+%%     StateName :: atom(), StateData :: term()) ->
+%%   {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term()} |
+%%   {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term(),
+%%     timeout() | hibernate} |
+%%   {next_state, NextStateName :: atom(), NewStateData :: term()} |
+%%   {next_state, NextStateName :: atom(), NewStateData :: term(),
+%%     timeout() | hibernate} |
+%%   {stop, Reason :: term(), Reply :: term(), NewStateData :: term()} |
+%%   {stop, Reason :: term(), NewStateData :: term()}).
+
+%% ==========================================
+%% ZIP CALL
+%% ==========================================
+
+%% TODO
+
+%% ==========================================
+%% IS_EMPTY CALL
+%% ==========================================
+
+%% TODO
+
+handle_sync_event(_Event, From, StateName, State) ->
+  {reply, {ok, From, 123}, StateName, State}.
+
+handle_info(_Info, StateName, State) -> {next_state, StateName, State}.
+
+terminate(_Reason, _StateName, _State) -> ok.
+
+code_change(_OldVsn, StateName, State, _Extra) -> {ok, StateName, State}.
 
 %%%===================================================================
 %%% Internal functions

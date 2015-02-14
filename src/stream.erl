@@ -76,7 +76,6 @@ from_list(List) ->
 -spec(pause(Stream :: #stream{}) -> #stream{}).
 pause(Stream) -> Stream#stream{is_paused = true}.
 
-%% TODO
 -spec(drain(Stream :: #stream{}) -> #stream{}).
 drain(_Stream) ->
   #stream{is_paused = false}.
