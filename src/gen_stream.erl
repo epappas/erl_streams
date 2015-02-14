@@ -150,13 +150,13 @@ paused(_Event, State) -> {next_state, ?PAUSED, State}.
 
 paused(take, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
-  {reply, {ok, Resource}, ?OPEN, NewStream};
+  {reply, {ok, Resource}, ?PAUSED, NewStream};
 
 paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
   {reply, {ok, ResourceList}, ?OPEN, NewStream};
 
-paused(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
+paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
 
 %% ==========================================
 %% STOPPED STATE
