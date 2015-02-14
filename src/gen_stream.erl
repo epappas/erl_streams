@@ -193,13 +193,21 @@ handle_event({pipe, _Stream_FSM}, StateName, #stream{} = Stream) ->
 %% DRAIN CALL
 %% ==========================================
 
-%% TODO
+handle_event(drain, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?OPEN, Stream#stream{is_paused = false}};
 
 %% ==========================================
 %% PAUSE CALL
 %% ==========================================
 
-%% TODO
+handle_event(pause, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?OPEN, Stream#stream{is_paused = true}};
 
 %% ==========================================
 %% FILTER CALL
@@ -220,17 +228,6 @@ handle_event({pipe, _Stream_FSM}, StateName, #stream{} = Stream) ->
 %% TODO
 
 handle_event(_Event, StateName, State) -> {next_state, StateName, State}.
-
-%% -spec(handle_sync_event(Event :: term(), From :: {pid(), Tag :: term()},
-%%     StateName :: atom(), StateData :: term()) ->
-%%   {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term()} |
-%%   {reply, Reply :: term(), NextStateName :: atom(), NewStateData :: term(),
-%%     timeout() | hibernate} |
-%%   {next_state, NextStateName :: atom(), NewStateData :: term()} |
-%%   {next_state, NextStateName :: atom(), NewStateData :: term(),
-%%     timeout() | hibernate} |
-%%   {stop, Reason :: term(), Reply :: term(), NewStateData :: term()} |
-%%   {stop, Reason :: term(), NewStateData :: term()}).
 
 %% ==========================================
 %% ZIP CALL
