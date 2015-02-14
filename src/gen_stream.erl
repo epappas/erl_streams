@@ -50,6 +50,12 @@
   init/1,
   open/2,
   open/3,
+  paused/2,
+  paused/3,
+  stopped/2,
+  stopped/3,
+  closed/2,
+  closed/3,
   handle_event/3,
   handle_sync_event/4,
   handle_info/3,
@@ -120,7 +126,7 @@ open({put, Resource}, #stream{} = Stream) ->
   {ok, NewStream} = stream:put(Stream, Resource),
   {next_state, ?OPEN, NewStream};
 
-open(_Event, #stream{} = State) -> {next_state, state_name, State}.
+open(_Event, #stream{} = State) -> {next_state, ?OPEN, State}.
 
 open(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, closed}, ?CLOSED, Stream};
 
@@ -138,13 +144,35 @@ open(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
 %% PAUSED STATE
 %% ==========================================
 
+paused({put, _Resource}, Stream) -> {next_state, ?PAUSED, Stream};
+
+paused(_Event, State) -> {next_state, ?PAUSED, State}.
+
+paused(take, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {reply, {ok, Resource}, ?OPEN, NewStream};
+
+paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {reply, {ok, ResourceList}, ?OPEN, NewStream};
+
+paused(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
+
 %% ==========================================
 %% STOPPED STATE
 %% ==========================================
 
+stopped(_Event, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_stoped = true}}.
+
+stopped(_Event, _From, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_stoped = true}}.
+
 %% ==========================================
 %% CLOSED STATE
 %% ==========================================
+
+closed(_Event, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_closed = true}}.
+
+closed(_Event, _From, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_closed = true}}.
 
 %% -spec(handle_event(Event :: term(), StateName :: atom(),
 %%     StateData :: #stream{}) ->
