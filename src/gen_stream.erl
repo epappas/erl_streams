@@ -104,7 +104,15 @@ start_link(Name, Mod, Args, Options) ->
 start_link() ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-put(StreamPID, Resource) -> gen_fsm:send_event(StreamPID, {put, Resource}).
+put(StreamPID, Resource) ->
+  case gen_stream:is_open(StreamPID) of
+    false ->
+      case gen_stream:is_paused(StreamPID) of
+        false -> {error, closed};
+        true -> {error, pause}
+      end;
+    true -> gen_fsm:send_event(StreamPID, {put, Resource})
+  end.
 
 take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
 
