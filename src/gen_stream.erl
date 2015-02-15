@@ -52,6 +52,10 @@
   map/2,
   reduce/2,
   is_empty/1,
+  is_paused/1,
+  is_closed/1,
+  is_stopped/1,
+  is_open/1,
   get_stream/1
 ]).
 
@@ -117,6 +121,14 @@ map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
 reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
 
 is_empty(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_empty).
+
+is_paused(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_paused).
+
+is_closed(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_closed).
+
+is_stopped(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_stopped).
+
+is_open(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_open).
 
 get_stream(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, get_stream).
 
@@ -277,6 +289,46 @@ handle_event(_Event, StateName, State) -> {next_state, StateName, State}.
 
 handle_sync_event(is_empty, _From, StateName, #stream{} = Stream) ->
   {reply, stream:is_empty(Stream), StateName, Stream};
+
+%% ==========================================
+%% IS_PAUSED CALL
+%% ==========================================
+
+handle_sync_event(is_paused, _From, ?PAUSED, #stream{} = Stream) ->
+  {reply, true, ?PAUSED, Stream};
+
+handle_sync_event(is_paused, _From, StateName, #stream{} = Stream) ->
+  {reply, false, StateName, Stream};
+
+%% ==========================================
+%% IS_CLOSED CALL
+%% ==========================================
+
+handle_sync_event(is_closed, _From, ?CLOSED, #stream{} = Stream) ->
+  {reply, true, ?CLOSED, Stream};
+
+handle_sync_event(is_closed, _From, StateName, #stream{} = Stream) ->
+  {reply, false, StateName, Stream};
+
+%% ==========================================
+%% IS_STOPPED CALL
+%% ==========================================
+
+handle_sync_event(is_stopped, _From, ?STOPPED, #stream{} = Stream) ->
+  {reply, true, ?STOPPED, Stream};
+
+handle_sync_event(is_stopped, _From, StateName, #stream{} = Stream) ->
+  {reply, false, StateName, Stream};
+
+%% ==========================================
+%% IS_OPEN CALL
+%% ==========================================
+
+handle_sync_event(is_open, _From, ?OPEN, #stream{} = Stream) ->
+  {reply, true, ?OPEN, Stream};
+
+handle_sync_event(is_open, _From, StateName, #stream{} = Stream) ->
+  {reply, false, StateName, Stream};
 
 %% ==========================================
 %% GET_STREAM CALL
