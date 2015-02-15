@@ -44,6 +44,7 @@
   put/2,
   take/1,
   take/2,
+  take_and_pause/1,
   drain/1,
   pause/1,
   pipe/1,
@@ -118,6 +119,8 @@ take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
 
 take(StreamPID, Number) -> gen_fsm:sync_send_event(StreamPID, {take, Number}).
 
+take_and_pause(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take_and_pause).
+
 drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
 
 pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
@@ -188,6 +191,10 @@ open(take, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
   {reply, {ok, Resource}, ?OPEN, NewStream};
 
+open(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {reply, {ok, Resource}, ?PAUSED, NewStream};
+
 open({take, Number}, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
   {reply, {ok, ResourceList}, ?OPEN, NewStream};
@@ -202,8 +209,18 @@ paused({put, _Resource}, Stream) -> {next_state, ?PAUSED, Stream};
 
 paused(_Event, State) -> {next_state, ?PAUSED, State}.
 
+%% ===== Syncronous =====
+
+paused(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, closed}, ?CLOSED, Stream};
+
+paused(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
+
 paused(take, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
+  {reply, {ok, Resource}, ?PAUSED, NewStream};
+
+paused(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
 paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
