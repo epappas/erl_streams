@@ -41,8 +41,18 @@
   start/1,
   start_link/0,
   start_link/4,
+  put/2,
+  take/1,
+  take/2,
+  drain/1,
+  pause/1,
   pipe/1,
-  pipe/2
+  pipe/2,
+  filter/2,
+  map/2,
+  reduce/2,
+  is_empty/1,
+  get_stream/1
 ]).
 
 %% gen_fsm callbacks
@@ -89,6 +99,26 @@ start_link(Name, Mod, Args, Options) ->
 -spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+put(StreamPID, Resource) -> gen_fsm:send_event(StreamPID, {put, Resource}).
+
+take(StreamPID) -> gen_fsm:send_event(StreamPID, take).
+
+take(StreamPID, Number) -> gen_fsm:send_event(StreamPID, {take, Number}).
+
+drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
+
+pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
+
+filter(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {filter, Fn}).
+
+map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
+
+reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
+
+is_empty(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_empty).
+
+get_stream(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, get_stream).
 
 -spec(pipe(any()) -> {ok, pid()}).
 pipe(Mod) -> pipe(Mod, []).
@@ -174,19 +204,12 @@ closed(_Event, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_clo
 
 closed(_Event, _From, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream{is_closed = true}}.
 
-%% -spec(handle_event(Event :: term(), StateName :: atom(),
-%%     StateData :: #stream{}) ->
-%%   {next_state, NextStateName :: atom(), NewStateData :: #stream{}} |
-%%   {next_state, NextStateName :: atom(), NewStateData :: #stream{},
-%%     timeout() | hibernate} |
-%%   {stop, Reason :: term(), NewStateData :: #stream{}}).
-
 %% ==========================================
 %% PIPE CALL
 %% ==========================================
 
 %% TODO
-handle_event({pipe, _Stream_FSM}, StateName, #stream{} = Stream) ->
+handle_event({pipe, _StreamPID}, StateName, #stream{} = Stream) ->
   {next_state, StateName, Stream};
 
 %% ==========================================
@@ -213,19 +236,32 @@ handle_event(pause, _StateName, #stream{
 %% FILTER CALL
 %% ==========================================
 
-%% TODO
+handle_event({filter, Fn}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) -> {next_state, ?OPEN, stream:filter(Stream, Fn)};
 
 %% ==========================================
 %% MAP CALL
 %% ==========================================
 
-%% TODO
+handle_event({map, Fn}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) -> {next_state, ?OPEN, stream:map(Stream, Fn)};
 
 %% ==========================================
 %% REDUCE CALL
 %% ==========================================
 
-%% TODO
+handle_event({reduce, Fn}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) -> {next_state, ?OPEN, stream:reduce(Stream, Fn)};
+
+%% ==========================================
+%% FALLBACK CALL
+%% ==========================================
 
 handle_event(_Event, StateName, State) -> {next_state, StateName, State}.
 
@@ -239,10 +275,21 @@ handle_event(_Event, StateName, State) -> {next_state, StateName, State}.
 %% IS_EMPTY CALL
 %% ==========================================
 
-%% TODO
+handle_sync_event(is_empty, _From, StateName, #stream{} = Stream) ->
+  {reply, stream:is_empty(Stream), StateName, Stream};
 
-handle_sync_event(_Event, From, StateName, State) ->
-  {reply, {ok, From, 123}, StateName, State}.
+%% ==========================================
+%% GET_STREAM CALL
+%% ==========================================
+
+handle_sync_event(get_stream, _From, StateName, #stream{} = Stream) -> {reply, Stream, StateName, Stream};
+
+%% ==========================================
+%% FALLBACK CALL
+%% ==========================================
+
+handle_sync_event(_Event, _From, StateName, State) ->
+  {reply, {error, bad_call}, StateName, State}.
 
 handle_info(_Info, StateName, State) -> {next_state, StateName, State}.
 
