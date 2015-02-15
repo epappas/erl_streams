@@ -38,13 +38,21 @@
 
 %% API
 -export([
+%%   TODO start/0,
   start/1,
   start_link/0,
   start_link/4,
   put/2,
+%%   TODO put_from_list/2,
+%%   TODO put_while/2,
   take/1,
   take/2,
   take_and_pause/1,
+%%   TODO take_while/2,
+%%   TODO drop/1,
+%%   TODO drop_while/1,
+%%   TODO delay/1,
+%%   TODO delay_while/1,
   drain/1,
   pause/1,
   pipe/1,
