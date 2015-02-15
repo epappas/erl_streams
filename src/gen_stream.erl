@@ -102,9 +102,9 @@ start_link() ->
 
 put(StreamPID, Resource) -> gen_fsm:send_event(StreamPID, {put, Resource}).
 
-take(StreamPID) -> gen_fsm:send_event(StreamPID, take).
+take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
 
-take(StreamPID, Number) -> gen_fsm:send_event(StreamPID, {take, Number}).
+take(StreamPID, Number) -> gen_fsm:sync_send_event(StreamPID, {take, Number}).
 
 drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
 
