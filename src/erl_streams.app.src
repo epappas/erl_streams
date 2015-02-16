@@ -31,7 +31,10 @@
 {application, erl_streams, [
   {description, "Streams in Erlang"},
   {vsn, "0.0.1"},
-  {registered, []},
+  {registered, [
+    stream,
+    gen_stream
+  ]},
   {applications, [
     kernel,
     stdlib
