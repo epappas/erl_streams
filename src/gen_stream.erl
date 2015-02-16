@@ -279,7 +279,7 @@ handle_event(pause, _StateName, #stream{
   is_closed = false,
   is_stoped = false
 } = Stream) ->
-  {next_state, ?OPEN, Stream#stream{is_paused = true}};
+  {next_state, ?PAUSED, Stream#stream{is_paused = true}};
 
 %% ==========================================
 %% FILTER CALL
