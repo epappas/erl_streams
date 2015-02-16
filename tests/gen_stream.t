@@ -33,7 +33,7 @@
 -include("../src/erl_streams_commons.hrl").
 
 main(_) ->
-  etap:plan(4),
+  etap:plan(9),
 
   {ok, StreamPID} = gen_stream:start(test),
 
@@ -46,6 +46,16 @@ main(_) ->
   etap:is_ok(gen_stream:put(StreamPID, 1), "gen_stream:put should return ok"),
 
   etap:is(gen_stream:take(StreamPID), {ok, 1},"gen_stream:take should pop the buffer"),
+
+  etap:is_ok(gen_stream:pause(StreamPID), "gen_stream:pause should return ok"),
+
+  etap:is(gen_stream:put(StreamPID, test), {error, pause}, "paused stream should return {error, pause} on put"),
+
+  etap:is_ok(gen_stream:drain(StreamPID), "gen_stream:drain should return ok"),
+
+  etap:is_ok(gen_stream:drain(StreamPID), "gen_stream:drain should return ok no matter what state"),
+
+  etap:is_ok(gen_stream:put(StreamPID, 1), "gen_stream:put should return ok after drain"),
 
   etap:end_tests(),
   ok.
