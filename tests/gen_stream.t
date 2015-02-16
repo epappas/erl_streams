@@ -63,7 +63,7 @@ main(_) ->
 
   etap:is(gen_stream:is_paused(StreamPID), true, "gen_stream:take_and_pause should pause the stream"),
 
-  gen_stream:drain(StreamPID), %% unpause it
+  ok = gen_stream:drain(StreamPID), %% unpause it
 
   etap:end_tests(),
   ok.
