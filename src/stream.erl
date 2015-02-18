@@ -38,6 +38,7 @@
 -export([
   new/0,
   new/1,
+  new/2,
   from_list/1,
   pause/1,
   drain/1,
@@ -66,6 +67,10 @@ new() -> new(new_stream).
 -spec(new(Name :: term()) -> #stream{}).
 new(Name) ->
   #stream{name = Name}.
+
+-spec(new(Name :: term(), Max :: number()) -> #stream{}).
+new(Name, Max) ->
+  #stream{name = Name, max_buffer = Max}.
 
 -spec(from_list(List :: iolist()) -> #stream{}).
 from_list(List) ->
