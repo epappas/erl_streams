@@ -33,8 +33,16 @@
 -include("../src/erl_streams_commons.hrl").
 
 main(_) ->
-  etap:plan(12),
+  etap:plan(unknown),
 
+  test_in_n_out(),
+  test_pause(),
+  test_max_buffer(),
+
+  etap:end_tests(),
+  ok.
+
+test_in_n_out() ->
   {ok, StreamPID} = gen_stream:start(test),
 
   #stream{} = gen_stream:get_stream(StreamPID),
@@ -47,7 +55,10 @@ main(_) ->
 
   etap:is(gen_stream:take(StreamPID), {ok, 1},"gen_stream:take should pop the buffer"),
 
-  etap:is(gen_stream:take(StreamPID), {ok, undefined},"gen_stream:take should pop undefined"),
+  etap:is(gen_stream:take(StreamPID), {ok, undefined},"gen_stream:take should pop undefined").
+
+test_pause() ->
+  {ok, StreamPID} = gen_stream:start(test),
 
   etap:is_ok(gen_stream:pause(StreamPID), "gen_stream:pause should return ok"),
 
@@ -61,9 +72,21 @@ main(_) ->
 
   etap:is(gen_stream:take_and_pause(StreamPID), {ok, 1}, "gen_stream:take_and_pause should pop the buffer"),
 
-  etap:is(gen_stream:is_paused(StreamPID), true, "gen_stream:take_and_pause should pause the stream"),
+  etap:is(gen_stream:is_paused(StreamPID), true, "gen_stream:take_and_pause should pause the stream").
 
-  ok = gen_stream:drain(StreamPID), %% unpause it
+test_max_buffer() ->
+  {ok, StreamPID} = gen_stream:start(test, 1),
 
-  etap:end_tests(),
-  ok.
+  ok = gen_stream:put(StreamPID, test),
+
+  etap:is(gen_stream:put(StreamPID, test), {error, pause}, "MAX buffer should have succesfully been reached"),
+
+  ok = gen_stream:drain(StreamPID),
+
+  etap:is(gen_stream:put(StreamPID, test), {error, pause}, "drain() shouldn't overite max_buffer state"),
+
+  {ok, test} = gen_stream:take(StreamPID),
+  {ok, undefined} = gen_stream:take(StreamPID),
+
+  ok = gen_stream:drain(StreamPID),
+  etap:is_ok(gen_stream:put(StreamPID, test), "When backpresure is resolved, should unpause after drain").

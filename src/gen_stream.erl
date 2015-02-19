@@ -40,6 +40,7 @@
 -export([
 %%   TODO start/0,
   start/1,
+  start/2,
   start_link/0,
   start_link/4,
   put/2,
@@ -60,6 +61,7 @@
   filter/2,
   map/2,
   reduce/2,
+  can_accept/1,
   is_empty/1,
   is_paused/1,
   is_closed/1,
@@ -103,7 +105,10 @@
 %%%===================================================================
 -spec(start(any()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name) ->
-  gen_fsm:start(?MODULE, [Name], []).
+  gen_fsm:start(?MODULE, [{name, Name}], []).
+
+start(Name, Max) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []).
 
 -spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
 start_link(Name, Mod, Args, Options) ->
@@ -113,14 +118,18 @@ start_link(Name, Mod, Args, Options) ->
 start_link() ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-put(StreamPID, Resource) ->
-  case gen_stream:is_open(StreamPID) of
+put(StreamPID, Resource) -> %% TODO implement can_accept()
+  case gen_stream:can_accept(StreamPID) of
+    true -> gen_fsm:send_event(StreamPID, {put, Resource});
     false ->
       case gen_stream:is_paused(StreamPID) of
-        false -> {error, closed};
-        true -> {error, pause}
-      end;
-    true -> gen_fsm:send_event(StreamPID, {put, Resource})
+        true -> {error, pause};
+        false ->
+          case gen_stream:is_stopped(StreamPID) of
+            true -> {error, stopped};
+            false -> {error, closed}
+          end
+      end
   end.
 
 take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
@@ -138,6 +147,8 @@ filter(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {filter, Fn}).
 map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
 
 reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
+
+can_accept(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, can_accept).
 
 is_empty(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_empty).
 
@@ -165,7 +176,13 @@ pipe(Mod, Args) -> {ok, {?MODULE, {Mod, Args}}}.
   {ok, StateName :: atom(), StateData :: #stream{}} |
   {ok, StateName :: atom(), StateData :: #stream{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init(_Args) -> {ok, ?OPEN, stream:new()}.
+init([]) -> {ok, ?OPEN, stream:new()};
+
+init(ArgsList) when is_list(ArgsList) ->
+  Name = proplists:get_value(name, ArgsList, new_stream),
+  Max = proplists:get_value(max, ArgsList, 134217728),
+
+  {ok, ?OPEN, stream:new(Name, Max)}.
 
 %% ==========================================
 %% OPEN STATE
@@ -184,8 +201,16 @@ open({put, Fn}, #stream{} = Stream) when is_function(Fn) ->
   {next_state, ?OPEN, NewStream};
 
 open({put, Resource}, #stream{} = Stream) ->
-  {ok, NewStream} = stream:put(Stream, Resource),
-  {next_state, ?OPEN, NewStream};
+  case stream:put(Stream, Resource) of
+    {ok, NewStream} ->
+      {next_state, ?OPEN, NewStream};
+    {pause, NewStream} ->
+      {next_state, ?PAUSED, NewStream};
+    {stopped, NewStream} -> %% | {closed, #stream{}} ->
+      {next_state, ?STOPPED, NewStream};
+    {closed, NewStream} ->
+      {next_state, ?CLOSED, NewStream}
+  end;
 
 open(_Event, #stream{} = State) -> {next_state, ?OPEN, State}.
 
@@ -233,7 +258,7 @@ paused(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
 
 paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
-  {reply, {ok, ResourceList}, ?OPEN, NewStream};
+  {reply, {ok, ResourceList}, ?PAUSED, NewStream};
 
 paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
 
@@ -331,7 +356,30 @@ handle_sync_event(is_empty, _From, StateName, #stream{} = Stream) ->
 %% IS_PAUSED CALL
 %% ==========================================
 
+handle_sync_event(can_accept, _From, ?OPEN, #stream{
+  is_paused = false,
+  is_closed = false,
+  is_stoped = false,
+  buffer = Buffer,
+  max_buffer = MAX
+} = Stream) when length(Buffer) < MAX ->
+  {reply, true, ?OPEN, Stream};
+
+handle_sync_event(can_accept, _From, StateName, #stream{} = Stream) ->
+  {reply, false, StateName, Stream};
+
+%% ==========================================
+%% IS_PAUSED CALL
+%% ==========================================
+
 handle_sync_event(is_paused, _From, ?PAUSED, #stream{} = Stream) ->
+  {reply, true, ?PAUSED, Stream};
+
+handle_sync_event(is_paused, _From, _StateName, #stream{
+  is_paused = false,
+  buffer = Buffer,
+  max_buffer = MAX
+} = Stream) when length(Buffer) >= MAX ->
   {reply, true, ?PAUSED, Stream};
 
 handle_sync_event(is_paused, _From, StateName, #stream{} = Stream) ->
