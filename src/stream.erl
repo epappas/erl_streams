@@ -49,6 +49,7 @@
   take/2,
   take_and_pause/1,
   take_while/2,
+  resume/1,
   drop/1,
   drop_while/2,
   filter/2,
@@ -58,7 +59,8 @@
   reduce/2,
   reduce/3,
   zip/2,
-  is_empty/1
+  is_empty/1,
+  is_dropping/1
 ]).
 
 -spec(new() -> #stream{}).
@@ -98,9 +100,24 @@ put(#stream{buffer = Buffer, max_buffer = MAX} = Stream, _Resource) when length(
   {pause, Stream#stream{is_paused = true}};
 
 put(#stream{
+  is_dropping = true,
+  dropping_ctr = DR_Ctr,
+  dropping_fn = Dropping_Fn
+} = Stream, Resource) ->
+  case Dropping_Fn(Stream, Resource) of
+    %% if codition no longer exists, retry
+    false -> stream:put(resume(Stream), Resource);
+    %% stream should keep dropping messages, just raise the counter
+    true -> {ok, Stream#stream{
+      dropping_ctr = DR_Ctr + 1
+    }}
+  end;
+
+put(#stream{
   is_paused = false,
   is_stoped = false,
   is_closed = false,
+  is_dropping = false,
   buffer = Buffer
 } = Stream, Resource) ->
   {ok, Stream#stream{
@@ -166,13 +183,34 @@ take_while(Stream, Fn) ->
     false -> NewStream
   end.
 
-%% TODO
--spec(drop(Stream :: #stream{}) -> #stream{}).
-drop(_Stream) -> #stream{}.
+-spec(resume(Stream :: #stream{}) -> #stream{}).
+resume(#stream{} = Stream) ->
+  Stream#stream{
+    is_dropping = false,
+    dropping_ctr = 0,
+    dropping_fn = undefined
+  }.
 
-%% TODO
+-spec(drop(Stream :: #stream{}) -> #stream{}).
+drop(#stream{} = Stream) ->
+  Stream#stream{
+    is_dropping = true,
+    dropping_ctr = 0,
+    dropping_fn =
+    fun(#stream{
+      dropping_ctr = DR_Ctr
+    } = _ThisStream, _Resource) ->
+      DR_Ctr < 1
+    end
+  }.
+
 -spec(drop_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-drop_while(_Stream, _Fn) -> #stream{}.
+drop_while(Stream, Dropping_Cond_FN) ->
+  Stream#stream{
+    is_dropping = true,
+    dropping_ctr = 0,
+    dropping_fn = Dropping_Cond_FN
+  }.
 
 %% TODO
 -spec(delay(Stream :: #stream{}) -> #stream{}).
@@ -227,3 +265,7 @@ zip(#stream{buffer = LBuffer, pre_waterfall = LPRW, post_waterfall = LPOW} = _Le
 -spec(is_empty(Stream :: #stream{}) -> boolean()).
 is_empty(#stream{buffer = []} = _Stream) -> true;
 is_empty(#stream{} = _Stream) -> false.
+
+-spec(is_dropping(Stream :: #stream{}) -> boolean()).
+is_dropping(#stream{is_dropping = true} = _Stream) -> true;
+is_dropping(#stream{} = _Stream) -> false.

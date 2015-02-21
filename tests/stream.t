@@ -33,7 +33,7 @@
 -include("../src/erl_streams_commons.hrl").
 
 main(_) ->
-  etap:plan(4),
+  etap:plan(unknown),
   Stream = stream:new(),
   #stream{name = Name} = Stream,
 
@@ -54,7 +54,55 @@ main(_) ->
   {StreamB2, BB} = stream:take(StreamB1),
   {_StreamB3, BC} = stream:take(StreamB2),
 
-  etap:is([BA, BB, BC], [1,2,3], "Take should get the elements from the inserted list"),
+  etap:is([BA, BB, BC], [1, 2, 3], "Take should get the elements from the inserted list"),
+
+  test_dropping(),
+
+  test_dropping_while(),
 
   etap:end_tests(),
   ok.
+
+test_dropping() ->
+  Stream = stream:new(),
+
+  {ok, Stream1} = stream:put(Stream, 0),
+
+  Stream2 = stream:drop(Stream1), %% will drop the next one
+
+  etap:is(stream:is_dropping(Stream2), true, "Stream should be in dropping state"),
+
+  {ok, Stream3} = stream:put(Stream2, 1),
+
+  {ok, Stream4} = stream:put(Stream3, 2), %% this action should unblock the stream
+
+  etap:is(stream:is_dropping(Stream4), false, "Stream should escape dropping state after 1 put"),
+
+  #stream{buffer = Buffer} = Stream4,
+
+  etap:is(Buffer, [0, 2], "One message should be missing").
+
+test_dropping_while() ->
+  Stream = stream:new(),
+
+  %% Initial put with non dropping condition
+  {ok, Stream1} = stream:put(Stream, 0),
+
+  Stream2 = stream:drop_while(Stream1,
+    fun(#stream{} = _Stream, Resource) ->
+      case Resource of
+        5 -> false;
+        _ -> true
+      end
+    end
+  ), %% will drop while 5 is not given
+
+  etap:is(stream:is_dropping(Stream2), true, "Stream should be in dropping state"),
+
+  {ok, Stream3} = stream:put_from_list(Stream2, [1, 2, 3, 4, 5, 6, 7, 8, 9]),
+
+  etap:is(stream:is_dropping(Stream3), false, "Stream have stoped dropping"),
+
+  #stream{buffer = Buffer} = Stream3,
+
+  etap:is(Buffer, [0, 5, 6, 7, 8, 9], "All non valid messages should be missing").

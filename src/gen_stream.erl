@@ -118,7 +118,7 @@ start_link(Name, Mod, Args, Options) ->
 start_link() ->
   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-put(StreamPID, Resource) -> %% TODO implement can_accept()
+put(StreamPID, Resource) ->
   case gen_stream:can_accept(StreamPID) of
     true -> gen_fsm:send_event(StreamPID, {put, Resource});
     false ->

@@ -41,6 +41,9 @@
   is_closed = false,
   is_paused = false,
   is_stoped = false,
+  is_dropping = false,
+  dropping_fn,
+  dropping_ctr = 0,
   max_buffer = 134217728
 }).
 
