@@ -43,18 +43,18 @@
   pause/1,
   drain/1,
   put/2,
+  put_with_delay/3,
   put_from_list/2,
   put_while/2,
   take/1,
   take/2,
+  take_with_delay/2,
   take_and_pause/1,
   take_while/2,
   resume/1,
   drop/1,
   drop_while/2,
   filter/2,
-  delay/1,
-  delay_while/2,
   map/2,
   reduce/2,
   reduce/3,
@@ -105,9 +105,9 @@ put(#stream{
   dropping_fn = Dropping_Fn
 } = Stream, Resource) ->
   case Dropping_Fn(Stream, Resource) of
-    %% if codition no longer exists, retry
+  %% if codition no longer exists, retry
     false -> stream:put(resume(Stream), Resource);
-    %% stream should keep dropping messages, just raise the counter
+  %% stream should keep dropping messages, just raise the counter
     true -> {ok, Stream#stream{
       dropping_ctr = DR_Ctr + 1
     }}
@@ -123,6 +123,11 @@ put(#stream{
   {ok, Stream#stream{
     buffer = lists:append(Buffer, [Resource])
   }}.
+
+-spec(put_with_delay(Stream :: #stream{}, Resource :: any(), Delay :: number()) ->
+  {'ok', {integer(), reference()}} | {'error', term()}).
+put_with_delay(#stream{} = Stream, Resource, Delay) when Delay =:= 0 ->
+  timer:apply_after(Delay, stream, put, [Stream, Resource]).
 
 -spec(put_from_list(Stream :: #stream{}, ResourceList :: list()) ->
   {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
@@ -170,6 +175,11 @@ take(#stream{buffer = Buffer} = Stream) ->
   [H | T] = Buffer,
   {Stream#stream{buffer = T}, H}.
 
+-spec(take_with_delay(Stream :: #stream{}, Delay :: number()) -> {#stream{}, iolist()}).
+take_with_delay(#stream{} = Stream, Delay) ->
+  ok = timer:sleep(Delay),
+  take(Stream).
+
 -spec(take_and_pause(Stream :: #stream{}) -> {#stream{}, iolist()}).
 take_and_pause(#stream{} = Stream) ->
   {NewStream, Resource} = take(Stream),
@@ -211,14 +221,6 @@ drop_while(Stream, Dropping_Cond_FN) ->
     dropping_ctr = 0,
     dropping_fn = Dropping_Cond_FN
   }.
-
-%% TODO
--spec(delay(Stream :: #stream{}) -> #stream{}).
-delay(_Stream) -> #stream{}.
-
-%% TODO
--spec(delay_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-delay_while(_Stream, _Fn) -> #stream{}.
 
 -spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
 filter(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) ->
