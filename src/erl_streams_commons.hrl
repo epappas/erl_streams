@@ -38,6 +38,7 @@
   pipes = [],
   pre_waterfall = [],
   post_waterfall = [],
+  reduce_acc = undefined,
   is_closed = false,
   is_paused = false,
   is_stoped = false,
