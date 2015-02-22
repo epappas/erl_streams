@@ -119,9 +119,7 @@ put(#stream{
   is_closed = false,
   is_dropping = false
 } = Stream, Resource) ->
-  {ok, Stream#stream{
-    buffer = pre_waterfall_tick(Stream, Resource)
-  }}.
+  {ok, pre_waterfall_tick(Stream, Resource)}.
 
 -spec(put_with_delay(Stream :: #stream{}, Resource :: any(), Delay :: number()) ->
   {'ok', {integer(), reference()}} | {'error', term()}).
@@ -172,13 +170,7 @@ take_loop(#stream{buffer = Buffer} = Stream, Number, SoFar) ->
 take(#stream{buffer = Buffer} = Stream) when Buffer =:= [] -> {Stream#stream{}, undefined};
 take(#stream{buffer = Buffer} = Stream) ->
   [Value | RestValues] = Buffer,
-  NewStream =
-    post_waterfall_tick(
-      Stream#stream{buffer = RestValues},
-      Value
-    ),
-  #stream{reduce_acc = NewVal} = NewStream,
-  {NewStream, NewVal}.
+  {Stream#stream{buffer = RestValues}, Value}.
 
 -spec(take_with_delay(Stream :: #stream{}, Delay :: number()) -> {#stream{}, iolist()}).
 take_with_delay(#stream{} = Stream, Delay) ->
@@ -247,11 +239,11 @@ map(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) ->
 reduce(Stream, Fn) -> reduce(Stream, Fn, undefined).
 
 -spec(reduce(Stream :: #stream{}, Fn :: fun(), Acc :: any()) -> #stream{}).
-reduce(#stream{post_waterfall = PostWaterfall} = Stream, Fn, Acc) when is_function(Fn) ->
+reduce(#stream{pre_waterfall = PreWaterfall} = Stream, Fn, Acc) when is_function(Fn) ->
   Stream#stream{
     reduce_acc = Acc,
-    post_waterfall = lists:append(
-      PostWaterfall, [[
+    pre_waterfall = lists:append(
+      PreWaterfall, [[
         {type, reduce},
         {fn, Fn}
       ]]
@@ -284,11 +276,13 @@ is_dropping(#stream{} = _Stream) -> false.
 pre_waterfall_tick(#stream{pre_waterfall = PREW} = Stream, Resource) ->
   pre_waterfall_tick(Stream, Resource, PREW).
 
-pre_waterfall_tick(#stream{buffer = Buffer} = _Stream, undefined, _PREW) ->
-  Buffer;
+pre_waterfall_tick(#stream{} = Stream, undefined, _PREW) ->
+  Stream;
 
-pre_waterfall_tick(#stream{buffer = Buffer} = _Stream, Resource, []) ->
-  lists:append(Buffer, [Resource]);
+pre_waterfall_tick(#stream{buffer = Buffer} = Stream, Resource, []) ->
+  Stream#stream{
+    buffer = lists:append(Buffer, [Resource])
+  };
 
 pre_waterfall_tick(#stream{} = Stream, Resource, [Next | RestPREW]) ->
 
@@ -299,7 +293,9 @@ pre_waterfall_tick(#stream{} = Stream, Resource, [Next | RestPREW]) ->
       {type, map} ->
         pre_waterfall_map(Stream, Resource, RestArgs);
       {type, filter} ->
-        pre_waterfall_filter(Stream, Resource, RestArgs)
+        pre_waterfall_filter(Stream, Resource, RestArgs);
+      {type, reduce} ->
+        pre_waterfall_reduce(Stream, Resource, RestArgs)
     end,
 
   pre_waterfall_tick(NewStream, NewResource, RestPREW).
@@ -315,29 +311,12 @@ pre_waterfall_filter(#stream{buffer = Buffer} = Stream, Resource, [{fn, FilterFn
     end,
   {Stream#stream{}, NewResource}.
 
-post_waterfall_tick(#stream{post_waterfall = POSW} = Stream, Resource) ->
-  post_waterfall_tick(Stream, Resource, POSW).
-
-post_waterfall_tick(Stream, Resource, []) ->
-  Stream#stream{reduce_acc = Resource};
-
-post_waterfall_tick(Stream, Resource, [Next | RestPOSW]) ->
-  [Type | RestArgs] = Next,
-
-  {NewStream, NewResource} =
-    case Type of
-      {type, reduce} ->
-        post_waterfall_reduce(Stream, Resource, RestArgs)
-    end,
-
-  post_waterfall_tick(NewStream, NewResource, RestPOSW).
-
-post_waterfall_reduce(#stream{
+pre_waterfall_reduce(#stream{
   reduce_acc = Acc,
   buffer = Buffer
 } = Stream, Resource, [{fn, ReduceFn}]) ->
 
   NewAcc = ReduceFn(Acc, Resource, Buffer),
 
-  {Stream#stream{reduce_acc = NewAcc}, NewAcc}.
+  {Stream#stream{reduce_acc = NewAcc, buffer = []}, NewAcc}.
 
