@@ -60,6 +60,12 @@ main(_) ->
 
   test_dropping_while(),
 
+  test_map(),
+
+  test_filter(),
+
+  test_reduce(),
+
   etap:end_tests(),
   ok.
 
@@ -106,3 +112,57 @@ test_dropping_while() ->
   #stream{buffer = Buffer} = Stream3,
 
   etap:is(Buffer, [0, 5, 6, 7, 8, 9], "All non valid messages should be missing").
+
+test_map() ->
+  Stream = stream:new(),
+
+  Stream1 = stream:map(Stream,
+    fun(Resource, _Buffer) ->
+      Resource + 1
+    end
+  ),
+
+  {ok, Stream2} = stream:put(Stream1, 0),
+  {ok, Stream3} = stream:put(Stream2, 1),
+  {ok, Stream4} = stream:put(Stream3, 2),
+
+  #stream{buffer = Buffer} = Stream4,
+
+  etap:is(Buffer, [1, 2, 3], "Map fun should have alter the values").
+
+test_filter() ->
+  Stream = stream:new(),
+
+  Stream1 = stream:filter(Stream,
+    fun(Resource, _Buffer) ->
+      Resource =:= 1
+    end
+  ),
+
+  {ok, Stream2} = stream:put(Stream1, 0),
+  {ok, Stream3} = stream:put(Stream2, 1),
+  {ok, Stream4} = stream:put(Stream3, 2),
+
+  #stream{buffer = Buffer} = Stream4,
+
+  etap:is(Buffer, [1], "Filter() should have filter the input").
+
+test_reduce() ->
+  Stream = stream:new(),
+
+  Stream1 = stream:reduce(Stream,
+    fun(Acc, Resource, _Buffer) ->
+      math:pow(Acc, Resource)
+    end,
+    2
+  ),
+
+  {ok, Stream2} = stream:put(Stream1, 1),
+  {ok, Stream3} = stream:put(Stream2, 2),
+  {ok, Stream4} = stream:put(Stream3, 3),
+
+  #stream{buffer = Buffer, reduce_acc = Acc} = Stream4,
+
+  etap:is(Buffer, [64.0], "Values should have been reduced"),
+
+  etap:is(Acc, 64.0, "Accumulator should be updated").
