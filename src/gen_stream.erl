@@ -45,7 +45,7 @@
   start_link/4,
   put/2,
   put_from_list/2,
-%%   TODO put_while/2,
+  put_while/2,
   take/1,
   take/2,
   take_and_pause/1,
@@ -145,6 +145,14 @@ put_from_list(StreamPID, ResourceList) ->
   case gen_stream:put(StreamPID, H) of
     ok -> stream:put_from_list(StreamPID, T);
     OtherState -> OtherState %% closed, isPaused, or anything else
+  end.
+
+-spec(put_while(StreamPID :: pid(), Fn :: fun()) ->
+  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
+put_while(StreamPID, Fn) when is_function(Fn) ->
+  case Fn(StreamPID) of
+    undefined -> ok;
+    Resource -> gen_stream:put(StreamPID, Resource)
   end.
 
 take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
