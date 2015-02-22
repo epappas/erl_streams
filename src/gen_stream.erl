@@ -49,7 +49,6 @@
   take/1,
   take/2,
   take_and_pause/1,
-%%   TODO take_while/2,
 %%   TODO drop/1,
 %%   TODO drop_while/1,
 %%   TODO delay/1,

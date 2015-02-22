@@ -50,7 +50,6 @@
   take/2,
   take_with_delay/2,
   take_and_pause/1,
-  take_while/2,
   resume/1,
   drop/1,
   drop_while/2,
@@ -181,14 +180,6 @@ take_with_delay(#stream{} = Stream, Delay) ->
 take_and_pause(#stream{} = Stream) ->
   {NewStream, Resource} = take(Stream),
   {NewStream#stream{is_paused = true}, Resource}.
-
--spec(take_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
-take_while(Stream, Fn) ->
-  {NewStream, Resource} = take(Stream),
-  case Fn(Resource) of
-    true -> take_while(NewStream, Fn);
-    false -> NewStream
-  end.
 
 -spec(resume(Stream :: #stream{}) -> #stream{}).
 resume(#stream{} = Stream) ->
