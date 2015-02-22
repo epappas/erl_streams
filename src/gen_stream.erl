@@ -38,7 +38,7 @@
 
 %% API
 -export([
-%%   TODO start/0,
+  start/0,
   start/1,
   start/2,
   start_link/0,
@@ -103,6 +103,11 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+-spec(start() -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
+start() ->
+  gen_fsm:start(?MODULE, [], []).
+
+
 -spec(start(any()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name) ->
   gen_fsm:start(?MODULE, [{name, Name}], []).
