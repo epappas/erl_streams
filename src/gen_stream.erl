@@ -231,16 +231,32 @@ open({put, Fn}, #stream{} = Stream) when is_function(Fn) ->
   {ok, NewStream} = stream:put_while(Stream, Fn),
   {next_state, ?OPEN, NewStream};
 
-open({put, Resource}, #stream{} = Stream) ->
+open({put, Resource}, #stream{mod = undefined} = Stream) ->
   case stream:put(Stream, Resource) of
     {ok, NewStream} ->
       {next_state, ?OPEN, NewStream};
     {pause, NewStream} ->
       {next_state, ?PAUSED, NewStream};
-    {stopped, NewStream} -> %% | {closed, #stream{}} ->
+    {stopped, NewStream} ->
       {next_state, ?STOPPED, NewStream};
     {closed, NewStream} ->
       {next_state, ?CLOSED, NewStream}
+  end;
+
+open({put, Resource}, #stream{mod = Mod} = Stream) ->
+  case Mod:on_data(Stream, Resource) of
+    {ignore, MaybeNewStream} -> {next_state, ?OPEN, MaybeNewStream};
+    {ok, MaybeNewStream} ->
+      case stream:put(Stream, Resource) of
+        {ok, NewStream} ->
+          {next_state, ?OPEN, NewStream};
+        {pause, NewStream} ->
+          {next_state, ?PAUSED, NewStream};
+        {stopped, NewStream} ->
+          {next_state, ?STOPPED, NewStream};
+        {closed, NewStream} ->
+          {next_state, ?CLOSED, NewStream}
+      end
   end;
 
 open(_Event, #stream{} = State) -> {next_state, ?OPEN, State}.
