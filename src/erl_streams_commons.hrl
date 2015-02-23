@@ -31,9 +31,8 @@
 -author("evangelosp").
 
 -record(stream, {
-  pid,
   name,
-  producer,
+  mod = undefined,
   buffer = [],
   pipes = [],
   pre_waterfall = [],

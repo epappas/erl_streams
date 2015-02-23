@@ -41,8 +41,9 @@
   start/0,
   start/1,
   start/2,
-  start_link/0,
-  start_link/4,
+  start/3,
+%%   TODO start_link/0,
+%%   TODO start_link/4,
   put/2,
   put_from_list/2,
   put_while/2,
@@ -106,21 +107,26 @@
 start() ->
   gen_fsm:start(?MODULE, [], []).
 
-
 -spec(start(any()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name) ->
   gen_fsm:start(?MODULE, [{name, Name}], []).
 
-start(Name, Max) ->
-  gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []).
+start(Name, Max) when is_number(Max) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []);
 
--spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link(Name, Mod, Args, Options) ->
-  gen_fsm:start_link(Name, Mod, Args, Options).
+start(Name, Mod) when is_atom(Mod) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}], []).
 
--spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
+start(Name, Mod, Max) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}], []).
+
+%% -spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
+%% start_link(Name, Mod, Args, Options) ->
+%%   gen_fsm:start_link(Name, Mod, Args, Options).
+%%
+%% -spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
+%% start_link() ->
+%%   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 put(StreamPID, Resource) ->
   case gen_stream:can_accept(StreamPID) of
@@ -203,8 +209,11 @@ init([]) -> {ok, ?OPEN, stream:new()};
 init(ArgsList) when is_list(ArgsList) ->
   Name = proplists:get_value(name, ArgsList, new_stream),
   Max = proplists:get_value(max, ArgsList, 134217728),
+  Mod = proplists:get_value(mod, ArgsList, undefined),
 
-  {ok, ?OPEN, stream:new(Name, Max)}.
+  Stream = stream:new(Name, Max),
+
+  {ok, ?OPEN, Stream#stream{mod = Mod}}.
 
 %% ==========================================
 %% OPEN STATE
