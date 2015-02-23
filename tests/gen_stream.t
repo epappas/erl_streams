@@ -89,4 +89,5 @@ test_max_buffer() ->
   {ok, undefined} = gen_stream:take(StreamPID),
 
   ok = gen_stream:drain(StreamPID),
-  etap:is_ok(gen_stream:put(StreamPID, test), "When backpresure is resolved, should unpause after drain").
+  etap:is_ok(gen_stream:put(StreamPID, test), "When backpresure is resolved, should unpause after drain"),
+  etap:is(gen_stream:take(StreamPID), {ok, test}, "take after resolving backpresure").
