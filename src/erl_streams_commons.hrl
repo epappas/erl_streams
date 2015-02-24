@@ -33,6 +33,7 @@
 -record(stream, {
   name,
   mod = undefined,
+  mod_state = undefined,
   buffer = [],
   pipes = [],
   pre_waterfall = [],

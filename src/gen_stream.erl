@@ -221,10 +221,16 @@ init(ArgsList) when is_list(ArgsList) ->
   Name = proplists:get_value(name, ArgsList, new_stream),
   Max = proplists:get_value(max, ArgsList, 134217728),
   Mod = proplists:get_value(mod, ArgsList, undefined),
+  Mod_Args = proplists:get_value(mod_args, ArgsList, []),
 
   Stream = stream:new(Name, Max),
 
-  {ok, ?OPEN, Stream#stream{mod = Mod}}.
+  case Mod:init(Mod_Args) of
+    {ok, StateData} ->
+      {ok, ?OPEN, Stream#stream{mod = Mod, mod_state = StateData}};
+    {stop, Reason} ->
+      {stop, Reason}
+  end.
 
 %% ==========================================
 %% OPEN STATE
