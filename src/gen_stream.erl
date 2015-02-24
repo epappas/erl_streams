@@ -100,6 +100,17 @@
 %%% Interface functions.
 %%%===================================================================
 
+-callback init(Args :: term()) ->
+  {ok, StateData :: term()} | {stop, Reason :: term()}.
+
+-callback on_data(Stream :: #stream{}, Resource :: any()) ->
+  {ignore, #stream{}} | {ok, #stream{}}.
+
+-callback on_offer(Stream :: #stream{}, Resource :: any()) ->
+  {#stream{}, any()}.
+
+-callback on_state(Stream :: #stream{}, State :: atom()) -> ok.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
