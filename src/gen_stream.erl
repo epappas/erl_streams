@@ -331,17 +331,32 @@ paused(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, clo
 
 paused(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
 
-paused(take, _From, #stream{is_closed = false} = Stream) ->
+paused(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
-paused(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
+paused(take, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream};
+
+paused(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
-paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
+paused(take_and_pause, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream};
+
+paused({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
   {reply, {ok, ResourceList}, ?PAUSED, NewStream};
+
+paused({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {MaybeNewStream, RSrcList} = Mod:on_offer(NewStream, ResourceList),
+  {reply, {ok, RSrcList}, ?PAUSED, MaybeNewStream};
 
 paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
 
