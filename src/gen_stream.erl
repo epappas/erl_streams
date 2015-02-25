@@ -225,11 +225,15 @@ init(ArgsList) when is_list(ArgsList) ->
 
   Stream = stream:new(Name, Max),
 
-  case Mod:init(Mod_Args) of
-    {ok, StateData} ->
-      {ok, ?OPEN, Stream#stream{mod = Mod, mod_state = StateData}};
-    {stop, Reason} ->
-      {stop, Reason}
+  case Mod of
+    undefined -> {ok, ?OPEN, Stream#stream{max_buffer = Max, name = Name}};
+    Mod ->
+      case Mod:init(Mod_Args) of
+        {ok, StateData} ->
+          {ok, ?OPEN, Stream#stream{mod = Mod, mod_state = StateData, max_buffer = Max, name = Name}};
+        {stop, Reason} ->
+          {stop, Reason}
+      end
   end.
 
 %% ==========================================
