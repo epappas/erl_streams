@@ -42,6 +42,7 @@
   start/1,
   start/2,
   start/3,
+  start/4,
 %%   TODO start_link/0,
 %%   TODO start_link/4,
   put/2,
@@ -128,8 +129,11 @@ start(Name, Max) when is_number(Max) ->
 start(Name, Mod) when is_atom(Mod) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}], []).
 
-start(Name, Mod, Max) ->
+start(Name, Max, Mod) when is_number(Max) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}], []).
+
+start(Name, Max, Mod, ModArgs) when is_list(ModArgs) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}, {mod_args, ModArgs}], []).
 
 %% -spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
 %% start_link(Name, Mod, Args, Options) ->
