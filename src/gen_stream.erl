@@ -58,11 +58,12 @@
   drop_while/2,
   resume/1,
   pause/1,
-  pipe/1,
-  pipe/2,
+  pipe/1, %%   TODO
+  pipe/2,%%   TODO
   filter/2,
   map/2,
   reduce/2,
+%%   TODO zip/2,
   can_accept/1,
   is_empty/1,
   is_paused/1,
@@ -385,10 +386,41 @@ dropping({put, _Resource}, #stream{is_closed = true} = Stream) -> {next_state, ?
 dropping({put, _Resource}, #stream{is_dropping = false} = Stream) ->
   open({put, _Resource}, stream:resume(Stream));
 
-dropping({put, _Resource}, #stream{} = Stream) ->
-  {next_state, ?DROPPING, Stream};
+dropping({put, Resource}, #stream{} = Stream) when is_list(Resource) ->
+  case stream:put_from_list(Stream, Resource) of
+    {ok, #stream{is_dropping = false} = NewStream} -> {next_state, ?OPEN, NewStream};
+    {ok, #stream{is_dropping = true} = NewStream} -> {next_state, ?DROPPING, NewStream}
+  end;
 
-dropping(_Event, #stream{} = State) -> {next_state, ?DROPPING, State}.
+dropping({put, Fn}, #stream{} = Stream) when is_function(Fn) ->
+  case stream:put_while(Stream, Fn) of
+    {ok, #stream{is_dropping = false} = NewStream} -> {next_state, ?OPEN, NewStream};
+    {ok, #stream{is_dropping = true} = NewStream} -> {next_state, ?DROPPING, NewStream}
+  end;
+
+dropping({put, Resource}, #stream{mod = undefined} = Stream) ->
+  case stream:put(Stream, Resource) of
+    {ok, #stream{is_dropping = false} = NewStream} -> {next_state, ?OPEN, NewStream};
+    {ok, #stream{is_dropping = true} = NewStream} -> {next_state, ?DROPPING, NewStream};
+    {pause, NewStream} -> {next_state, ?PAUSED, NewStream};
+    {stopped, NewStream} -> {next_state, ?STOPPED, NewStream};
+    {closed, NewStream} -> {next_state, ?CLOSED, NewStream}
+  end;
+
+dropping({put, Resource}, #stream{mod = Mod} = Stream) ->
+  case Mod:on_data(Stream, Resource) of
+    {ignore, MaybeNewStream} -> {next_state, ?OPEN, MaybeNewStream};
+    {ok, MaybeNewStream} ->
+      case stream:put(Stream, Resource) of
+        {ok, #stream{is_dropping = false} = NewStream} -> {next_state, ?OPEN, NewStream};
+        {ok, #stream{is_dropping = true} = NewStream} -> {next_state, ?DROPPING, NewStream};
+        {pause, NewStream} -> {next_state, ?PAUSED, NewStream};
+        {stopped, NewStream} -> {next_state, ?STOPPED, NewStream};
+        {closed, NewStream} -> {next_state, ?CLOSED, NewStream}
+      end
+  end;
+
+dropping(_Event, #stream{} = State) -> {next_state, ?OPEN, State}.
 
 %% ===== Syncronous =====
 
