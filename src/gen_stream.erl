@@ -51,11 +51,12 @@
   take/1,
   take/2,
   take_and_pause/1,
-%%   TODO drop/1,
-%%   TODO drop_while/1,
 %%   TODO delay/1,
 %%   TODO delay_while/1,
   drain/1,
+  drop/1,
+  drop_while/2,
+  resume/1,
   pause/1,
   pipe/1,
   pipe/2,
@@ -93,6 +94,7 @@
 
 %% States
 -define(OPEN, open).
+-define(DROPPING, dropping).
 -define(PAUSED, paused).
 -define(STOPPED, stopped).
 -define(CLOSED, closed).
@@ -182,6 +184,12 @@ take(StreamPID, Number) -> gen_fsm:sync_send_event(StreamPID, {take, Number}).
 take_and_pause(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take_and_pause).
 
 drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
+
+resume(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, resume).
+
+drop(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drop).
+
+drop_while(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {drop_while, Fn}).
 
 pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
 
@@ -397,6 +405,36 @@ handle_event(drain, _StateName, #stream{
   is_stoped = false
 } = Stream) ->
   {next_state, ?OPEN, Stream#stream{is_paused = false}};
+
+%% ==========================================
+%% RESUME CALL
+%% ==========================================
+
+handle_event(resume, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?OPEN, stream:resume(Stream)};
+
+%% ==========================================
+%% DROP CALL
+%% ==========================================
+
+handle_event(drop, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?DROPPING, stream:drop(Stream)};
+
+%% ==========================================
+%% DROP_WHILE CALL
+%% ==========================================
+
+handle_event({drop_while, Fn}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?DROPPING, stream:drop_while(Stream, Fn)};
 
 %% ==========================================
 %% PAUSE CALL
