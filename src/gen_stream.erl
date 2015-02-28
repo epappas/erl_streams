@@ -79,6 +79,8 @@
   open/3,
   paused/2,
   paused/3,
+  dropping/2,
+  dropping/3,
   stopped/2,
   stopped/3,
   closed/2,
@@ -371,6 +373,59 @@ paused({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
   {reply, {ok, RSrcList}, ?PAUSED, MaybeNewStream};
 
 paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
+
+%% ==========================================
+%% DROPPING STATE
+%% ==========================================
+
+dropping({put, _Resource}, #stream{is_paused = true} = Stream) -> {next_state, ?PAUSED, Stream};
+dropping({put, _Resource}, #stream{is_stoped = true} = Stream) -> {next_state, ?STOPPED, Stream};
+dropping({put, _Resource}, #stream{is_closed = true} = Stream) -> {next_state, ?CLOSED, Stream};
+
+dropping({put, _Resource}, #stream{is_dropping = false} = Stream) ->
+  open({put, _Resource}, stream:resume(Stream));
+
+dropping({put, _Resource}, #stream{} = Stream) ->
+  {next_state, ?DROPPING, Stream};
+
+dropping(_Event, #stream{} = State) -> {next_state, ?DROPPING, State}.
+
+%% ===== Syncronous =====
+
+dropping(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, closed}, ?CLOSED, Stream};
+dropping(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
+
+dropping(take, From, #stream{is_dropping = false} = Stream) ->
+  open(take, From, stream:resume(Stream));
+
+dropping(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {reply, {ok, Resource}, ?DROPPING, NewStream};
+
+dropping(take, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream};
+
+dropping(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {reply, {ok, Resource}, ?DROPPING, NewStream};
+
+dropping(take_and_pause, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream};
+
+dropping({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {reply, {ok, ResourceList}, ?DROPPING, NewStream};
+
+dropping({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {MaybeNewStream, RSrcList} = Mod:on_offer(NewStream, ResourceList),
+  {reply, {ok, RSrcList}, ?DROPPING, MaybeNewStream};
+
+dropping(_Event, _From, State) -> {reply, {error, bad_call}, ?DROPPING, State}.
 
 %% ==========================================
 %% STOPPED STATE
