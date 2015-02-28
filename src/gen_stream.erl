@@ -41,19 +41,22 @@
   start/0,
   start/1,
   start/2,
-  start_link/0,
-  start_link/4,
+  start/3,
+  start/4,
+%%   TODO start_link/0,
+%%   TODO start_link/4,
   put/2,
   put_from_list/2,
   put_while/2,
   take/1,
   take/2,
   take_and_pause/1,
-%%   TODO drop/1,
-%%   TODO drop_while/1,
 %%   TODO delay/1,
 %%   TODO delay_while/1,
   drain/1,
+  drop/1,
+  drop_while/2,
+  resume/1,
   pause/1,
   pipe/1,
   pipe/2,
@@ -76,6 +79,8 @@
   open/3,
   paused/2,
   paused/3,
+  dropping/2,
+  dropping/3,
   stopped/2,
   stopped/3,
   closed/2,
@@ -91,6 +96,7 @@
 
 %% States
 -define(OPEN, open).
+-define(DROPPING, dropping).
 -define(PAUSED, paused).
 -define(STOPPED, stopped).
 -define(CLOSED, closed).
@@ -99,6 +105,17 @@
 %%% Interface functions.
 %%%===================================================================
 
+-callback init(Args :: term()) ->
+  {ok, StateData :: term()} | {stop, Reason :: term()}.
+
+-callback on_data(Stream :: #stream{}, Resource :: any()) ->
+  {ignore, #stream{}} | {ok, #stream{}}.
+
+-callback on_offer(Stream :: #stream{}, Resource :: any()) ->
+  {#stream{}, any()}.
+
+-callback on_state(Stream :: #stream{}, State :: atom()) -> ok.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -106,21 +123,29 @@
 start() ->
   gen_fsm:start(?MODULE, [], []).
 
-
 -spec(start(any()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name) ->
   gen_fsm:start(?MODULE, [{name, Name}], []).
 
-start(Name, Max) ->
-  gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []).
+start(Name, Max) when is_number(Max) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []);
 
--spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link(Name, Mod, Args, Options) ->
-  gen_fsm:start_link(Name, Mod, Args, Options).
+start(Name, Mod) when is_atom(Mod) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}], []).
 
--spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
+start(Name, Max, Mod) when is_number(Max) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}], []).
+
+start(Name, Max, Mod, ModArgs) when is_list(ModArgs) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}, {mod_args, ModArgs}], []).
+
+%% -spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
+%% start_link(Name, Mod, Args, Options) ->
+%%   gen_fsm:start_link(Name, Mod, Args, Options).
+%%
+%% -spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
+%% start_link() ->
+%%   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 put(StreamPID, Resource) ->
   case gen_stream:can_accept(StreamPID) of
@@ -161,6 +186,12 @@ take(StreamPID, Number) -> gen_fsm:sync_send_event(StreamPID, {take, Number}).
 take_and_pause(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take_and_pause).
 
 drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
+
+resume(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, resume).
+
+drop(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drop).
+
+drop_while(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {drop_while, Fn}).
 
 pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
 
@@ -203,8 +234,21 @@ init([]) -> {ok, ?OPEN, stream:new()};
 init(ArgsList) when is_list(ArgsList) ->
   Name = proplists:get_value(name, ArgsList, new_stream),
   Max = proplists:get_value(max, ArgsList, 134217728),
+  Mod = proplists:get_value(mod, ArgsList, undefined),
+  Mod_Args = proplists:get_value(mod_args, ArgsList, []),
 
-  {ok, ?OPEN, stream:new(Name, Max)}.
+  Stream = stream:new(Name, Max),
+
+  case Mod of
+    undefined -> {ok, ?OPEN, Stream#stream{max_buffer = Max, name = Name}};
+    Mod ->
+      case Mod:init(Mod_Args) of
+        {ok, StateData} ->
+          {ok, ?OPEN, Stream#stream{mod = Mod, mod_state = StateData, max_buffer = Max, name = Name}};
+        {stop, Reason} ->
+          {stop, Reason}
+      end
+  end.
 
 %% ==========================================
 %% OPEN STATE
@@ -222,16 +266,32 @@ open({put, Fn}, #stream{} = Stream) when is_function(Fn) ->
   {ok, NewStream} = stream:put_while(Stream, Fn),
   {next_state, ?OPEN, NewStream};
 
-open({put, Resource}, #stream{} = Stream) ->
+open({put, Resource}, #stream{mod = undefined} = Stream) ->
   case stream:put(Stream, Resource) of
     {ok, NewStream} ->
       {next_state, ?OPEN, NewStream};
     {pause, NewStream} ->
       {next_state, ?PAUSED, NewStream};
-    {stopped, NewStream} -> %% | {closed, #stream{}} ->
+    {stopped, NewStream} ->
       {next_state, ?STOPPED, NewStream};
     {closed, NewStream} ->
       {next_state, ?CLOSED, NewStream}
+  end;
+
+open({put, Resource}, #stream{mod = Mod} = Stream) ->
+  case Mod:on_data(Stream, Resource) of
+    {ignore, MaybeNewStream} -> {next_state, ?OPEN, MaybeNewStream};
+    {ok, MaybeNewStream} ->
+      case stream:put(Stream, Resource) of
+        {ok, NewStream} ->
+          {next_state, ?OPEN, NewStream};
+        {pause, NewStream} ->
+          {next_state, ?PAUSED, NewStream};
+        {stopped, NewStream} ->
+          {next_state, ?STOPPED, NewStream};
+        {closed, NewStream} ->
+          {next_state, ?CLOSED, NewStream}
+      end
   end;
 
 open(_Event, #stream{} = State) -> {next_state, ?OPEN, State}.
@@ -242,17 +302,32 @@ open(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, close
 
 open(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
 
-open(take, _From, #stream{is_closed = false} = Stream) ->
+open(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
   {reply, {ok, Resource}, ?OPEN, NewStream};
 
-open(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
+open(take, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?OPEN, MaybeNewStream};
+
+open(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
-open({take, Number}, _From, #stream{is_closed = false} = Stream) ->
+open(take_and_pause, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream};
+
+open({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
   {reply, {ok, ResourceList}, ?OPEN, NewStream};
+
+open({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {MaybeNewStream, RSrcList} = Mod:on_offer(NewStream, ResourceList),
+  {reply, {ok, RSrcList}, ?OPEN, MaybeNewStream};
 
 open(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
 
@@ -270,19 +345,87 @@ paused(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, clo
 
 paused(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
 
-paused(take, _From, #stream{is_closed = false} = Stream) ->
+paused(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
-paused(take_and_pause, _From, #stream{is_closed = false} = Stream) ->
+paused(take, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream};
+
+paused(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
   {reply, {ok, Resource}, ?PAUSED, NewStream};
 
-paused({take, Number}, _From, #stream{is_closed = false} = Stream) ->
+paused(take_and_pause, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream};
+
+paused({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
   {reply, {ok, ResourceList}, ?PAUSED, NewStream};
 
+paused({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {MaybeNewStream, RSrcList} = Mod:on_offer(NewStream, ResourceList),
+  {reply, {ok, RSrcList}, ?PAUSED, MaybeNewStream};
+
 paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
+
+%% ==========================================
+%% DROPPING STATE
+%% ==========================================
+
+dropping({put, _Resource}, #stream{is_paused = true} = Stream) -> {next_state, ?PAUSED, Stream};
+dropping({put, _Resource}, #stream{is_stoped = true} = Stream) -> {next_state, ?STOPPED, Stream};
+dropping({put, _Resource}, #stream{is_closed = true} = Stream) -> {next_state, ?CLOSED, Stream};
+
+dropping({put, _Resource}, #stream{is_dropping = false} = Stream) ->
+  open({put, _Resource}, stream:resume(Stream));
+
+dropping({put, _Resource}, #stream{} = Stream) ->
+  {next_state, ?DROPPING, Stream};
+
+dropping(_Event, #stream{} = State) -> {next_state, ?DROPPING, State}.
+
+%% ===== Syncronous =====
+
+dropping(_Event, _From, #stream{is_closed = true} = Stream) -> {reply, {error, closed}, ?CLOSED, Stream};
+dropping(_Event, _From, #stream{is_stoped = true} = Stream) -> {reply, {error, stopped}, ?STOPPED, Stream};
+
+dropping(take, From, #stream{is_dropping = false} = Stream) ->
+  open(take, From, stream:resume(Stream));
+
+dropping(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {reply, {ok, Resource}, ?DROPPING, NewStream};
+
+dropping(take, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream};
+
+dropping(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {reply, {ok, Resource}, ?DROPPING, NewStream};
+
+dropping(take_and_pause, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, Resource} = stream:take_and_pause(Stream),
+  {MaybeNewStream, RSrc} = Mod:on_offer(NewStream, Resource),
+  {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream};
+
+dropping({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {reply, {ok, ResourceList}, ?DROPPING, NewStream};
+
+dropping({take, Number}, _From, #stream{is_closed = false, mod = Mod} = Stream) ->
+  {NewStream, ResourceList} = stream:take(Stream, Number),
+  {MaybeNewStream, RSrcList} = Mod:on_offer(NewStream, ResourceList),
+  {reply, {ok, RSrcList}, ?DROPPING, MaybeNewStream};
+
+dropping(_Event, _From, State) -> {reply, {error, bad_call}, ?DROPPING, State}.
 
 %% ==========================================
 %% STOPPED STATE
@@ -317,6 +460,36 @@ handle_event(drain, _StateName, #stream{
   is_stoped = false
 } = Stream) ->
   {next_state, ?OPEN, Stream#stream{is_paused = false}};
+
+%% ==========================================
+%% RESUME CALL
+%% ==========================================
+
+handle_event(resume, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?OPEN, stream:resume(Stream)};
+
+%% ==========================================
+%% DROP CALL
+%% ==========================================
+
+handle_event(drop, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?DROPPING, stream:drop(Stream)};
+
+%% ==========================================
+%% DROP_WHILE CALL
+%% ==========================================
+
+handle_event({drop_while, Fn}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) ->
+  {next_state, ?DROPPING, stream:drop_while(Stream, Fn)};
 
 %% ==========================================
 %% PAUSE CALL
