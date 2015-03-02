@@ -313,7 +313,7 @@ open(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
 
 open(take, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?OPEN, MaybeNewStream#stream{mod_state = SD}};
 
 open(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -322,7 +322,7 @@ open(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream
 
 open(take_and_pause, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream#stream{mod_state = SD}};
 
 open({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -331,7 +331,7 @@ open({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream
 
 open({take, Number}, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
-  {MaybeNewStream, RSrcList, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
+  {RSrcList, MaybeNewStream, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
   {reply, {ok, RSrcList}, ?OPEN, MaybeNewStream#stream{mod_state = SD}};
 
 open(_Event, _From, State) -> {reply, {error, bad_call}, ?OPEN, State}.
@@ -356,7 +356,7 @@ paused(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
 
 paused(take, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream#stream{mod_state = SD}};
 
 paused(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -365,7 +365,7 @@ paused(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stre
 
 paused(take_and_pause, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?PAUSED, MaybeNewStream#stream{mod_state = SD}};
 
 paused({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -374,7 +374,7 @@ paused({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stre
 
 paused({take, Number}, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
-  {MaybeNewStream, RSrcList, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
+  {RSrcList, MaybeNewStream, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
   {reply, {ok, RSrcList}, ?PAUSED, MaybeNewStream#stream{mod_state = SD}};
 
 paused(_Event, _From, State) -> {reply, {error, bad_call}, ?PAUSED, State}.
@@ -440,7 +440,7 @@ dropping(take, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
 
 dropping(take, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream#stream{mod_state = SD}};
 
 dropping(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -449,7 +449,7 @@ dropping(take_and_pause, _From, #stream{is_closed = false, mod = undefined} = St
 
 dropping(take_and_pause, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, Resource} = stream:take_and_pause(Stream),
-  {MaybeNewStream, RSrc, SD} = Mod:on_offer(Resource, NewStream, StateData),
+  {RSrc, MaybeNewStream, SD} = Mod:on_offer(Resource, NewStream, StateData),
   {reply, {ok, RSrc}, ?DROPPING, MaybeNewStream#stream{mod_state = SD}};
 
 dropping({take, Number}, _From, #stream{is_closed = false, mod = undefined} = Stream) ->
@@ -458,7 +458,7 @@ dropping({take, Number}, _From, #stream{is_closed = false, mod = undefined} = St
 
 dropping({take, Number}, _From, #stream{is_closed = false, mod = Mod, mod_state = StateData} = Stream) ->
   {NewStream, ResourceList} = stream:take(Stream, Number),
-  {MaybeNewStream, RSrcList, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
+  {RSrcList, MaybeNewStream, SD} = Mod:on_offer(ResourceList, NewStream, StateData),
   {reply, {ok, RSrcList}, ?DROPPING, MaybeNewStream#stream{mod_state = SD}};
 
 dropping(_Event, _From, State) -> {reply, {error, bad_call}, ?DROPPING, State}.
