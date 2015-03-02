@@ -12,7 +12,7 @@ compile:
 	@$(REBAR) -C rebar.config compile
 
 test:
-	@$(ERLC) -o tests/ tests/etap.erl
+	@$(ERLC) -o tests/ tests/*.erl
 	prove -v tests/*.t
 
 doc:
