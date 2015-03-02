@@ -135,6 +135,9 @@ start(Name, Max) when is_number(Max) ->
 start(Name, Mod) when is_atom(Mod) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}], []).
 
+start(Name, Mod, ModArgs) when is_list(ModArgs)  andalso is_atom(Mod) ->
+  gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {mod_args, ModArgs}], []);
+
 start(Name, Max, Mod) when is_number(Max) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}], []).
 
