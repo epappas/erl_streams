@@ -129,29 +129,25 @@ start() ->
 start(Name) ->
   gen_fsm:start(?MODULE, [{name, Name}], []).
 
+-spec(start(any(), number() | atom()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name, Max) when is_number(Max) ->
   gen_fsm:start(?MODULE, [{name, Name}, {max, Max}], []);
 
 start(Name, Mod) when is_atom(Mod) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}], []).
 
+-spec(start(any(), number() | atom(), list() | number()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name, Mod, ModArgs) when is_list(ModArgs)  andalso is_atom(Mod) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {mod_args, ModArgs}], []);
 
 start(Name, Max, Mod) when is_number(Max) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}], []).
 
+-spec(start(any(), number(), atom(), list()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}).
 start(Name, Max, Mod, ModArgs) when is_list(ModArgs) ->
   gen_fsm:start(?MODULE, [{name, Name}, {mod, Mod}, {max, Max}, {mod_args, ModArgs}], []).
 
-%% -spec(start_link(any(), any(), any(), any()) -> {ok, pid()} | ignore | {error, Reason :: term()}).
-%% start_link(Name, Mod, Args, Options) ->
-%%   gen_fsm:start_link(Name, Mod, Args, Options).
-%%
-%% -spec(start_link() -> {ok, pid()} | ignore | {error, Reason :: term()}).
-%% start_link() ->
-%%   gen_fsm:start_link({local, ?SERVER}, ?MODULE, [], []).
-
+-spec(put(pid(), any()) -> ok | {error, pause}).
 put(StreamPID, Resource) ->
   case gen_stream:can_accept(StreamPID) of
     true -> gen_fsm:send_event(StreamPID, {put, Resource});
@@ -166,8 +162,7 @@ put(StreamPID, Resource) ->
       end
   end.
 
--spec(put_from_list(StreamPID :: pid(), ResourceList :: list()) ->
-  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
+-spec(put_from_list(pid(), list()) -> ok | {error, pause}).
 put_from_list(_StreamPID, ResourceList) when ResourceList =:= [] -> ok;
 put_from_list(StreamPID, ResourceList) ->
   [H | T] = ResourceList,
@@ -176,48 +171,65 @@ put_from_list(StreamPID, ResourceList) ->
     OtherState -> OtherState %% closed, isPaused, or anything else
   end.
 
--spec(put_while(StreamPID :: pid(), Fn :: fun()) ->
-  {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
+-spec(put_while(pid(), fun()) -> ok | {error, pause}).
 put_while(StreamPID, Fn) when is_function(Fn) ->
   case Fn(StreamPID) of
     undefined -> ok;
     Resource -> gen_stream:put(StreamPID, Resource)
   end.
 
+-spec(take(pid()) -> {ok, any()}).
 take(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take).
 
+-spec(take(pid(), number()) -> {ok, any()}).
 take(StreamPID, Number) -> gen_fsm:sync_send_event(StreamPID, {take, Number}).
 
+-spec(take_and_pause(pid()) -> {ok, any()}).
 take_and_pause(StreamPID) -> gen_fsm:sync_send_event(StreamPID, take_and_pause).
 
+-spec(drain(pid()) -> ok).
 drain(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drain).
 
+-spec(resume(pid()) -> ok).
 resume(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, resume).
 
+-spec(drop(pid()) -> ok).
 drop(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drop).
 
+-spec(drop_while(pid(), fun()) -> ok).
 drop_while(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {drop_while, Fn}).
 
+-spec(pause(pid()) -> ok).
 pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
 
+-spec(filter(pid(), fun()) -> ok).
 filter(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {filter, Fn}).
 
+-spec(map(pid(), fun()) -> ok).
 map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
 
+-spec(reduce(pid(), fun()) -> ok).
 reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
 
+-spec(can_accept(pid()) -> boolean()).
 can_accept(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, can_accept).
 
+-spec(is_empty(pid()) -> boolean()).
 is_empty(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_empty).
 
+-spec(is_paused(pid()) -> boolean()).
 is_paused(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_paused).
 
+-spec(is_closed(pid()) -> boolean()).
 is_closed(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_closed).
 
+-spec(is_stopped(pid()) -> boolean()).
 is_stopped(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_stopped).
 
+-spec(is_open(pid()) -> boolean()).
 is_open(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_open).
 
+-spec(get_stream(pid()) -> #stream{}).
 get_stream(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, get_stream).
 
 -spec(pipe(any()) -> {ok, pid()}).
