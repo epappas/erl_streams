@@ -30,7 +30,6 @@
 
 -module(gen_stream).
 -author("epappas").
--vsn("0.0.1").
 
 -behaviour(gen_fsm).
 
@@ -43,27 +42,27 @@
   start/2,
   start/3,
   start/4,
-%%   TODO start_link/0,
-%%   TODO start_link/4,
+  %% TODO start_link/0,
+  %% TODO start_link/4,
   put/2,
   put_from_list/2,
   put_while/2,
   take/1,
   take/2,
   take_and_pause/1,
-%%   TODO delay/1,
-%%   TODO delay_while/1,
+  %% TODO delay/1,
+  %% TODO delay_while/1,
   drain/1,
   drop/1,
   drop_while/2,
   resume/1,
   pause/1,
-  pipe/1, %%   TODO
-  pipe/2,%%   TODO
+  %% TODO pipe/1,
+  %% TODO pipe/2,
   filter/2,
   map/2,
   reduce/2,
-%%   TODO zip/2,
+  %% TODO zip/2,
   can_accept/1,
   is_empty/1,
   is_paused/1,
@@ -231,12 +230,6 @@ is_open(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, is_open).
 
 -spec(get_stream(pid()) -> #stream{}).
 get_stream(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, get_stream).
-
--spec(pipe(any()) -> {ok, pid()}).
-pipe(Mod) -> pipe(Mod, []).
-
--spec(pipe(any(), any()) -> {ok, pid()}).
-pipe(Mod, Args) -> {ok, {?MODULE, {Mod, Args}}}.
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -496,8 +489,6 @@ closed(_Event, _From, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream
 %% ==========================================
 
 %% TODO
-handle_event({pipe, _StreamPID}, StateName, #stream{} = Stream) ->
-  {next_state, StateName, Stream};
 
 %% ==========================================
 %% DRAIN CALL

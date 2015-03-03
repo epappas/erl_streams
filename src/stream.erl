@@ -30,7 +30,6 @@
 
 -module(stream).
 -author("epappas").
--vsn("0.0.1").
 
 -include("erl_streams_commons.hrl").
 
