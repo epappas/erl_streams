@@ -62,6 +62,7 @@
   filter/2,
   map/2,
   reduce/2,
+  reduce/3,
   %% TODO zip/2,
   can_accept/1,
   is_empty/1,
@@ -209,6 +210,9 @@ map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
 
 -spec(reduce(pid(), fun()) -> ok).
 reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
+
+-spec(reduce(pid(), fun(), any()) -> ok).
+reduce(StreamPID, Fn, Acc) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn, Acc}).
 
 -spec(can_accept(pid()) -> boolean()).
 can_accept(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, can_accept).
@@ -566,6 +570,11 @@ handle_event({reduce, Fn}, _StateName, #stream{
   is_closed = false,
   is_stoped = false
 } = Stream) -> {next_state, ?OPEN, stream:reduce(Stream, Fn)};
+
+handle_event({reduce, Fn, Acc}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) -> {next_state, ?OPEN, stream:reduce(Stream, Fn, Acc)};
 
 %% ==========================================
 %% FALLBACK CALL
