@@ -169,6 +169,14 @@ Where `fun/2`
 
     ReduceFn(Acc, Resource, Buffer) -> NewAcc :: any()
     
+##### gen_stream:reduce/3,
+
+    gen_stream:reduce(pid(), fun(), Acc :: any()) -> ok
+    
+Where `fun/2`
+
+    ReduceFn(Acc, Resource, Buffer) -> NewAcc :: any()
+    
 ##### gen_stream:can_accept/1,
 
     gen_stream:can_accept(pid()) -> boolean()
@@ -196,6 +204,6 @@ Where `fun/2`
 
 #### As a data structure
 
-###### stream
+###### `#stream{}`
 
 A data structure with cases to handle backpressure, paused and closed states
