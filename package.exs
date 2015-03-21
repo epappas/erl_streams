@@ -1,7 +1,7 @@
 Expm.Package.new(
     name: "erl_streams",
     description: "Streams in Erlang",
-    version: "0.3.1",
+    version: "0.3.2",
     keywords: ["streams"],
     dependencies: [],
     licenses: [[name: "MIT", file: "LICENSE"]],
@@ -9,5 +9,5 @@ Expm.Package.new(
     maintainers: [
         [name: "Evangelos Pappas", email: "epappas@evalonlabs.com"]
     ],
-    repositories: [[github: "epappas/erl_streams", tag: "0.3.1"]]
+    repositories: [[github: "epappas/erl_streams", tag: "0.3.2"]]
 )
