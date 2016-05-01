@@ -57,8 +57,7 @@
   drop_while/2,
   resume/1,
   pause/1,
-  %% TODO pipe/1,
-  %% TODO pipe/2,
+  pipe/2,
   filter/2,
   map/2,
   reduce/2,
@@ -171,7 +170,7 @@ put_from_list(StreamPID, ResourceList) ->
     OtherState -> OtherState %% closed, isPaused, or anything else
   end.
 
--spec(put_while(pid(), fun()) -> ok | {error, pause}).
+-spec(put_while(pid(), any()) -> ok | {error, pause}).
 put_while(StreamPID, Fn) when is_function(Fn) ->
   case Fn(StreamPID) of
     undefined -> ok;
@@ -196,23 +195,26 @@ resume(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, resume).
 -spec(drop(pid()) -> ok).
 drop(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, drop).
 
--spec(drop_while(pid(), fun()) -> ok).
+-spec(drop_while(pid(), any()) -> ok).
 drop_while(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {drop_while, Fn}).
 
 -spec(pause(pid()) -> ok).
 pause(StreamPID) -> gen_fsm:send_all_state_event(StreamPID, pause).
 
--spec(filter(pid(), fun()) -> ok).
+-spec(filter(pid(), any()) -> ok).
 filter(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {filter, Fn}).
 
--spec(map(pid(), fun()) -> ok).
+-spec(map(pid(), any()) -> ok).
 map(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {map, Fn}).
 
--spec(reduce(pid(), fun()) -> ok).
+-spec(reduce(pid(), any()) -> ok).
 reduce(StreamPID, Fn) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn}).
 
--spec(reduce(pid(), fun(), any()) -> ok).
+-spec(reduce(pid(), any(), any()) -> ok).
 reduce(StreamPID, Fn, Acc) -> gen_fsm:send_all_state_event(StreamPID, {reduce, Fn, Acc}).
+
+-spec(pipe(pid(), pid()) -> ok).
+pipe(StreamPID, NextStreamPID) -> gen_fsm:send_all_state_event(StreamPID, {pipe, NextStreamPID}).
 
 -spec(can_accept(pid()) -> boolean()).
 can_accept(StreamPID) -> gen_fsm:sync_send_all_state_event(StreamPID, can_accept).
@@ -292,7 +294,7 @@ open({put, Resource}, #stream{mod = undefined} = Stream) ->
       {next_state, ?CLOSED, NewStream}
   end;
 
-open({put, Resource}, #stream{mod = Mod, mod_state = StateData} = Stream) ->
+open({put, Resource}, #stream{mod = Mod, mod_state = StateData, pipes = []} = Stream) ->
   case Mod:on_data(Resource, Stream, StateData) of
     {ignore, MaybeNewStream, SD} -> {next_state, ?OPEN, MaybeNewStream#stream{mod_state = SD}};
     {ok, MaybeNewStream, SD} ->
@@ -305,6 +307,33 @@ open({put, Resource}, #stream{mod = Mod, mod_state = StateData} = Stream) ->
           next_state(?STOPPED, NewStream);
         {closed, NewStream} ->
           next_state(?CLOSED, NewStream)
+      end
+  end;
+
+open({put, Resource}, #stream{mod = Mod, mod_state = StateData, pipes = Pipes} = Stream) ->
+  case Mod:on_data(Resource, Stream, StateData) of
+    {ignore, MaybeNewStream, SD} -> {next_state, ?OPEN, MaybeNewStream#stream{mod_state = SD}};
+    {ok, MaybeNewStream, SD} ->
+      {RSrc2, MaybeNewStream2, _} = Mod:on_offer(Resource, MaybeNewStream, SD),
+
+      RecursionFn = fun(SelfFn, NextPipeList) ->
+        case NextPipeList of
+          [] -> ok;
+          [NextStreamPID | RestPipeList] ->
+            case NextStreamPID of
+              undefined -> ok;
+              _ ->
+                case gen_stream:put(NextStreamPID, RSrc2) of
+                  ok -> SelfFn(SelfFn, RestPipeList);
+                  Err -> Err
+                end
+            end
+        end
+      end,
+
+      case RecursionFn(RecursionFn, Pipes) of
+        ok -> {next_state, ?OPEN, MaybeNewStream2};
+        _AnyOther -> next_state(?PAUSED, MaybeNewStream2)
       end
   end;
 
@@ -492,7 +521,10 @@ closed(_Event, _From, #stream{} = Stream) -> {next_state, ?CLOSED, Stream#stream
 %% PIPE CALL
 %% ==========================================
 
-%% TODO
+handle_event({pipe, NextStreamPID}, _StateName, #stream{
+  is_closed = false,
+  is_stoped = false
+} = Stream) -> {next_state, ?OPEN, stream:pipe(Stream, NextStreamPID)};
 
 %% ==========================================
 %% DRAIN CALL

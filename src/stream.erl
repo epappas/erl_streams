@@ -41,6 +41,7 @@
   from_list/1,
   pause/1,
   drain/1,
+  pipe/2,
   put/2,
   put_with_delay/3,
   put_from_list/2,
@@ -134,7 +135,7 @@ put_from_list(#stream{} = Stream, ResourceList) ->
     OtherState -> OtherState %% closed, isPaused, or anything else
   end.
 
--spec(put_while(Stream :: #stream{}, Fn :: fun()) ->
+-spec(put_while(Stream :: #stream{}, Fn :: any()) ->
   {ok, #stream{}} | {paused, #stream{} | {stopped, #stream{}} | {closed, #stream{}}}).
 put_while(#stream{is_paused = false} = Stream, _Fn) ->
   {pause, Stream};
@@ -152,6 +153,14 @@ put_while(#stream{
     undefined -> {ok, Stream};
     Resource -> stream:put(Stream#stream{}, Resource)
   end.
+
+-spec(pipe(Stream :: #stream{}, pid()) -> #stream{}).
+pipe(#stream{pipes = Pipes} = Stream, NextStreamPID) when is_pid(NextStreamPID) ->
+  Stream#stream{
+    pipes = lists:append(
+      Pipes, [NextStreamPID]
+    )
+  }.
 
 -spec(take(Stream :: #stream{}, Number :: number()) -> {#stream{}, list()}).
 take(#stream{is_closed = true} = Stream, _Number) -> {Stream, []};
@@ -194,14 +203,14 @@ drop(#stream{} = Stream) ->
     is_dropping = true,
     dropping_ctr = 0,
     dropping_fn =
-    fun(#stream{
-      dropping_ctr = DR_Ctr
-    } = _ThisStream, _Resource) ->
-      DR_Ctr < 1
-    end
+      fun(#stream{
+        dropping_ctr = DR_Ctr
+      } = _ThisStream, _Resource) ->
+        DR_Ctr < 1
+      end
   }.
 
--spec(drop_while(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+-spec(drop_while(Stream :: #stream{}, Fn :: any()) -> #stream{}).
 drop_while(Stream, Dropping_Cond_FN) ->
   Stream#stream{
     is_dropping = true,
@@ -209,7 +218,7 @@ drop_while(Stream, Dropping_Cond_FN) ->
     dropping_fn = Dropping_Cond_FN
   }.
 
--spec(filter(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+-spec(filter(Stream :: #stream{}, Fn :: any()) -> #stream{}).
 filter(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) ->
   Stream#stream{
     pre_waterfall = lists:append(
@@ -217,7 +226,7 @@ filter(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) 
     )
   }.
 
--spec(map(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+-spec(map(Stream :: #stream{}, Fn :: any()) -> #stream{}).
 map(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) ->
   Stream#stream{
     pre_waterfall = lists:append(
@@ -225,10 +234,10 @@ map(#stream{pre_waterfall = PreWaterfall} = Stream, Fn) when is_function(Fn) ->
     )
   }.
 
--spec(reduce(Stream :: #stream{}, Fn :: fun()) -> #stream{}).
+-spec(reduce(Stream :: #stream{}, Fn :: any()) -> #stream{}).
 reduce(Stream, Fn) -> reduce(Stream, Fn, undefined).
 
--spec(reduce(Stream :: #stream{}, Fn :: fun(), Acc :: any()) -> #stream{}).
+-spec(reduce(Stream :: #stream{}, Fn :: any(), Acc :: any()) -> #stream{}).
 reduce(#stream{pre_waterfall = PreWaterfall} = Stream, Fn, Acc) when is_function(Fn) ->
   Stream#stream{
     reduce_acc = Acc,
