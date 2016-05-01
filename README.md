@@ -41,6 +41,56 @@ Example:
     {error, pause} = gen_stream:put(StreamPID, test),
     {ok, test} = gen_stream:take(StreamPID),
     ok = gen_stream:put(StreamPID, test),
+
+    %% Pipe through resources
+
+    %% add2_stream
+
+    -module(add2_stream).
+
+    -behaviour(gen_stream).
+
+    %% gen_stream callbacks
+    -export([init/1, on_data/3, on_offer/3, on_state/3]).
+
+    init(_Args) -> {ok, {}}.
+
+    on_data(_Resource, Stream, State) -> {ok, Stream, State}.
+
+    on_offer(Resource, Stream, State) -> {Resource + 2, Stream, State}.
+
+    on_state(State, _Stream, StateData) -> {ok, StateData}.
+
+    %% multi2_stream
+
+    -module(multi2_stream).
+
+    -behaviour(gen_stream).
+
+    %% gen_stream callbacks
+    -export([init/1, on_data/3, on_offer/3, on_state/3]).
+
+    init(_Args) -> {ok, {}}.
+
+    on_data(_Resource, Stream, State) -> {ok, Stream, State}.
+
+    on_offer(Resource, Stream, State) -> {Resource * 2, Stream, State}.
+
+    on_state(State, _Stream, StateData) -> {ok, StateData}.
+
+
+    %% main...
+
+    {ok, AddStreamPID} = gen_stream:start(add2_stream, add2_stream, []),
+    {ok, MultiStream1PID} = gen_stream:start(multi2_stream, multi2_stream, []),
+    {ok, MultiStream2PID} = gen_stream:start(multi2_stream, multi2_stream, []),
+
+    gen_stream:pipe(AddStreamPID, MultiStream1PID),
+    gen_stream:pipe(MultiStream1PID, MultiStream2PID),
+
+    gen_stream:put(AddStreamPID, 3),
+
+    {ok, 20} = gen_stream:take(MultiStream2PID).
     
 
 #### Methods
@@ -78,6 +128,12 @@ Creates a Named stream with Max buffer or wraps a stream that implements the `ge
     gen_stream:start(any(), number(), atom(), list()) -> {ok, Pid} | {error, {already_started, Pid}} | {error, any()}
 
     {ok, Pid} = gen_stream:start(test, 10, simple_stream, InitArgs)
+
+##### gen_stream:pipe/2,
+
+    gen_stream:pipe(pid(), pid()) -> ok
+
+    ok = gen_stream:pipe(Stream_left_PID, Stream_right_PID)
     
 ##### gen_stream:put/2,
 
