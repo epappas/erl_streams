@@ -31,6 +31,10 @@
 {application, erl_streams, [
   {description, "Streams in Erlang"},
   {vsn, "0.4.0"},
+  {modules, [
+      stream,
+      gen_stream
+  ]},
   {registered, [
     stream,
     gen_stream
@@ -39,6 +43,5 @@
     kernel,
     stdlib
   ]},
-  {mod, {erl_streams, []}},
   {env, []}
 ]}.
